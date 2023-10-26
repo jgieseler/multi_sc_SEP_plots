@@ -45,7 +45,7 @@ moved this file to Deepnote June 15 2022
 #############################################################
 
 # processing mode: 'regular' (e.g. weekly) or 'events'
-mode = 'regular'
+mode = 'events'
 
 lower_proton = False  # True if 13 MeV protons should be used instead of 25+ MeV
 add_contaminating_channels = True
@@ -54,10 +54,15 @@ if add_contaminating_channels:
     add_sept_conta_ch = True  # True if contaminaiting STEREO-A/SEPT ion channel (ch 15) should be added to the 100 keV electron panel
     add_ept_conta_ch = True  # True if contaminaiting SolO/EPT ion channel (XXX) should be added to the 100 keV electron panel
     add_3dp_conta_ch = True  # True if contaminaiting Wind/3DP ion channel (XXX) should be added to the 100 keV electron panel
+    add_psp_conta_ch = True  # True if contaminaiting PSP/ISOIS/Epi-Lo ion channel (XXX) should be added to the 100 keV electron panel
+    add_bepi_conta_ch = True  # True if contaminaiting Bepi/SIXS ion channel (XXX) should be added to the 100 keV electron panel
+
 else:
     add_sept_conta_ch = False  # True if contaminaiting STEREO-A/SEPT ion channel (ch 15) should be added to the 100 keV electron panel
     add_ept_conta_ch = False  # True if contaminaiting SolO/EPT ion channel (XXX) should be added to the 100 keV electron panel
     add_3dp_conta_ch = False  # True if contaminaiting Wind/3DP ion channel (XXX) should be added to the 100 keV electron panel
+    add_psp_conta_ch = False  # True if contaminaiting PSP/ISOIS/Epi-Lo ion channel (XXX) should be added to the 100 keV electron panel
+    add_bepi_conta_ch = False  # True if contaminaiting Bepi/SIXS ion channel (XXX) should be added to the 100 keV electron panel
 
 if mode == 'regular':
     first_date = dt.datetime(2022, 8, 27)
@@ -697,7 +702,7 @@ if mode == 'regular':
 if mode == 'events':
     dates = all_onset_dates_first
 # for startdate in tqdm(dates.to_pydatetime()):  # not in use any more
-for i in tqdm(range(0, len(dates))):  # standard
+for i in tqdm(range(57, len(dates))):  # standard
     # for i in tqdm(range(7, len(dates))):
     # for i in tqdm([3, 25, 27, 30, 32, 34, 41, 43, 48]):  # replot some events which automatically are replaced with day+1 plots
     # for i in tqdm([3, 25, 27, 30, 32, 34, 41, 43, 48]):  # replot some events which automatically are replaced with day+1 plots
@@ -725,14 +730,16 @@ for i in tqdm(range(0, len(dates))):  # standard
             sixs_ch_p = [7]
         sixs_side = 2
         sixs_color = 'orange'  # seaborn_colorblind[4]  # orange?
-        sixs_path = '/home/gieseler/uni/bepi/data/bc_mpo_sixs/data_csv/cruise/sixs-p/raw'
+        # sixs_path = '/home/gieseler/uni/bepi/data/bc_mpo_sixs/data_csv/cruise/sixs-p/raw'
+        sixs_path = '/home/jagies/data/bepi/bc_mpo_sixs/data_csv/cruise/sixs-p/raw'
     if SOHO:
         soho_ephin_color = 'k'
         soho_erne_color = 'k'  # seaborn_colorblind[5]  # 'green'
         # av_soho = av
         soho_erne_resample = averaging  # '30min'
         soho_ephin_resample = averaging  # '30min'
-        soho_path = '/home/gieseler/uni/soho/data/'
+        # soho_path = '/home/gieseler/uni/soho/data/'
+        soho_path = '/home/jagies/data/soho/'
         if erne:
             erne_p_ch = [3, 4]  # [0]  # [4,5]  # 2
             if lower_proton:
@@ -754,7 +761,8 @@ for i in tqdm(range(0, len(dates))):  # standard
             het_ch_p = [11, 12]
         solo_ept_resample = averaging
         solo_het_resample = averaging
-        solo_path = '/home/gieseler/uni/solo/data/'
+        # solo_path = '/home/gieseler/uni/solo/data/'
+        solo_path = '/home/jagies/data/solo/'
     if STEREO:
         stereo_sept_color = 'orangered'  # seaborn_colorblind[3]  #
         stereo_het_color = 'orangered'  # seaborn_colorblind[3]  # 'coral'
@@ -770,14 +778,16 @@ for i in tqdm(range(0, len(dates))):  # standard
         sta_het_resample = averaging
         sta_sept_resample = averaging
         sta_let_resample = averaging
-        stereo_path = '/home/gieseler/uni/stereo/data/'
+        # stereo_path = '/home/gieseler/uni/stereo/data/'
+        stereo_path = '/home/jagies/data/stereo/'
     if WIND:
         wind_color = 'dimgrey'
         wind3dp_ch_e100 = 3
         wind3dp_ch_p = 6
         wind_3dp_resample = averaging  # '30min'
         wind_3dp_threshold = None  # 1e3/1e6  # None
-        wind_path = '/home/gieseler/uni/wind/data/'
+        # wind_path = '/home/gieseler/uni/wind/data/'
+        wind_path = '/home/jagies/data/wind/'
     if PSP:
         psp_epilo_ch_e100 = [4, 5]  # cf. psp_epilo_energies
         psp_het_ch_e = [3, 10]  # cf. psp_het_energies
@@ -785,9 +795,11 @@ for i in tqdm(range(0, len(dates))):  # standard
         if lower_proton:
             psp_het_ch_p = [4]
         psp_epilo_channel = 'F'
+        psp_epilo_channel_p = 'T'  # 'P' or 'T'
         psp_epilo_viewing = 3  # 3="sun", 7="antisun"
         psp_epilo_threshold = None  # 1e2  # None
-        psp_path = '/home/gieseler/uni/psp/data/'
+        # psp_path = '/home/gieseler/uni/psp/data/'
+        psp_path = '/home/jagies/data/psp/'
         psp_het_resample = averaging
         psp_epilo_resample = averaging
         psp_het_color = 'blueviolet'
@@ -797,7 +809,7 @@ for i in tqdm(range(0, len(dates))):  # standard
 
     if WIND:
         if wind3dp_e:
-            print('loading wind/3dp e')
+            print('loading wind/3dp e omni')
             wind3dp_e_df, wind3dp_e_meta = wind3dp_load(dataset="WI_SFSP_3DP",
                                                         startdate=startdate,
                                                         enddate=enddate,
@@ -809,7 +821,7 @@ for i in tqdm(range(0, len(dates))):  # standard
             wind3dp_ch_e = wind3dp_ch_e100
 
         if wind3dp_p or add_3dp_conta_ch:
-            print('loading wind/3dp p')
+            print('loading wind/3dp p omni')
             wind3dp_p_df, wind3dp_p_meta = wind3dp_load(dataset="WI_SOSP_3DP", startdate=startdate, enddate=enddate, resample=wind_3dp_resample, multi_index=False, path=wind_path, max_conn=1)
 
     if STEREO:
@@ -875,6 +887,14 @@ for i in tqdm(range(0, len(dates))):  # standard
                                                        path=psp_path, resample=None)
         if len(psp_epilo) == 0:
             print(f'No PSP/EPILO PE data for {startdate.date()} - {enddate.date()}')
+
+        if add_psp_conta_ch:
+            print('loading PSP/EPILO IC proton data')
+            psp_epilo_p, psp_epilo_p_energies = psp_isois_load('PSP_ISOIS-EPILO_L2-IC',
+                                                        startdate, enddate,
+                                                        epilo_channel=psp_epilo_channel_p,
+                                                        epilo_threshold=None,
+                                                        path=psp_path, resample=None)
 
     if SOLO:
         data_product = 'l2'
@@ -1008,10 +1028,17 @@ for i in tqdm(range(0, len(dates))):  # standard
             sixs_df_e100 = sixs_df_e[f'E{sixs_ch_e100}']
             sixs_e100_en_channel_string = sixs_meta['Energy_Bin_str'][f'E{sixs_ch_e100}']
 
+            if add_bepi_conta_ch:
+                # contaminatin protons withouth averaging:
+                sixs_df_p_conta = sixs_df_p[f'P{1}']
+                sixs_p_conta_en_channel_string = sixs_meta['Energy_Bin_str'][f'P{1}']
+
             if isinstance(sixs_resample, str):
                 sixs_df_e100 = resample_df(sixs_df_e100, sixs_resample)
                 sixs_df_e1 = resample_df(sixs_df_e1, sixs_resample)
                 sixs_df_p25 = resample_df(sixs_df_p25, sixs_resample)
+                if add_bepi_conta_ch:
+                    sixs_df_p_conta = resample_df(sixs_df_p_conta, sixs_resample)
 
     if PSP:
         if len(psp_het) > 0:
@@ -1050,6 +1077,31 @@ for i in tqdm(range(0, len(dates))):  # standard
                 if isinstance(psp_epilo_resample, str):
                     df_psp_epilo_e = resample_df(df_psp_epilo_e, psp_epilo_resample)
 
+        if add_psp_conta_ch:
+            if len(psp_epilo_p) == 0:
+                print(f'No PSP/EPILO IC proton data for {startdate.date()} - {enddate.date()}')
+            elif len(psp_epilo_p) > 0:
+                print('calc_av_en_flux_PSP_EPILO p 400 - 1000 keV')
+                if psp_epilo_viewing == 3:
+                    psp_epilo_viewing_p = [30, 31, 32, 33, 34, 35, 36, 37, 38, 39]
+                elif psp_epilo_viewing == 7:
+                    psp_epilo_viewing_p = [70, 71, 72, 73, 74, 75, 76, 77, 78, 79]
+
+                if psp_epilo_channel_p == 'P':
+                    psp_epilo_ch_p = [18, 23]
+                elif psp_epilo_channel_p == 'T':
+                    psp_epilo_ch_p = [11, 15]
+
+                df_psp_epilo_p, psp_epilo_chstring_p = calc_av_en_flux_PSP_EPILO(psp_epilo_p,
+                                                                                 psp_epilo_p_energies,
+                                                                                 psp_epilo_ch_p,
+                                                                                 species='H',
+                                                                                 mode='ic',
+                                                                                 chan=psp_epilo_channel_p,
+                                                                                 viewing=psp_epilo_viewing_p)
+                if isinstance(psp_epilo_resample, str):
+                        df_psp_epilo_p = resample_df(df_psp_epilo_p, psp_epilo_resample)
+
     ##########################################################################################
 
     panels = 0
@@ -1077,7 +1129,7 @@ for i in tqdm(range(0, len(dates))):  # standard
         species_string = 'Electrons'
         if ept_use_corr_e:
             species_string = 'Electrons (corrected)'
-
+        
         # plot flare times with arrows on top
         if mode == 'events':
             trans = blended_transform_factory(x_transform=ax.transData, y_transform=ax.transAxes)
@@ -1090,7 +1142,8 @@ for i in tqdm(range(0, len(dates))):  # standard
         if PSP:
             if len(psp_epilo) > 0:
                 ax.plot(df_psp_epilo_e.index, df_psp_epilo_e*100, color=psp_het_color, linewidth=linewidth,
-                        label='PSP '+r"$\bf{(count\ rate\ *100)}$"+'\nISOIS-EPILO '+psp_epilo_chstring_e+f'\nF (W{psp_epilo_viewing})',
+                        # label='PSP '+r"$\bf{(count\ rate\ *100)}$"+'\nISOIS-EPILO '+psp_epilo_chstring_e+f'\nF (W{psp_epilo_viewing})',
+                        label=f'PSP ISOIS-EPILO F (W{psp_epilo_viewing})\n'+psp_epilo_chstring_e+r" $\bf{(count\ rate\ *100)}$",
                         drawstyle='steps-mid')
             if plot_times:
                 [ax.axvline(i, lw=vlw, color=psp_het_color) for i in df_psp_onset_e100]
@@ -1099,10 +1152,11 @@ for i in tqdm(range(0, len(dates))):  # standard
         if Bepi:
             # ax.plot(sixs_e.index, sixs_e[sixs_ch_e], color='orange', linewidth=linewidth, label='BepiColombo\nSIXS '+sixs_chstrings[sixs_ch_e]+f'\nside {sixs_side_e}', drawstyle='steps-mid')
             if len(sixs_df) > 0:
-                ax.plot(sixs_df_e100.index, sixs_df_e100, color=sixs_color, linewidth=linewidth, label='BepiColombo/SIXS '+sixs_e100_en_channel_string+f' side {sixs_side}', drawstyle='steps-mid')
+                ax.plot(sixs_df_e100.index, sixs_df_e100, color=sixs_color, linewidth=linewidth, label=f'BepiColombo/SIXS side {sixs_side} '+sixs_e100_en_channel_string, drawstyle='steps-mid')
             if plot_times:
                 [ax.axvline(i, lw=vlw, color=sixs_color) for i in df_bepi_onset_e100]
                 [ax.axvline(i, lw=vlw, ls=':', color=sixs_color) for i in df_bepi_peak_e100]
+
         if SOLO:
             if ept and (len(ept_e) > 0):
                 flux_ept = df_ept_e.values
@@ -1110,7 +1164,7 @@ for i in tqdm(range(0, len(dates))):  # standard
                     for ch in ept_ch_e100:
                         ax.plot(df_ept_e.index.values, flux_ept[:, ch], linewidth=linewidth, color=solo_ept_color, label='SOLO\nEPT '+ept_en_str_e[ch, 0]+f'\n{sector}', drawstyle='steps-mid')
                 except IndexError:
-                    ax.plot(df_ept_e.index.values, flux_ept, linewidth=linewidth, color=solo_ept_color, label='SOLO\nEPT '+ept_chstring_e+f'\n{sector}', drawstyle='steps-mid')
+                    ax.plot(df_ept_e.index.values, flux_ept, linewidth=linewidth, color=solo_ept_color, label=f'SOLO/EPT {sector} '+ept_chstring_e, drawstyle='steps-mid')
             if plot_times:
                 [ax.axvline(i, lw=vlw, color=solo_ept_color) for i in df_solo_onset_e100]
                 [ax.axvline(i, lw=vlw, ls=':', color=solo_ept_color) for i in df_solo_peak_e100]
@@ -1118,10 +1172,10 @@ for i in tqdm(range(0, len(dates))):  # standard
             if sept_e:
                 if type(sept_ch_e) == list and len(sta_sept_avg_e) > 0:
                     ax.plot(sta_sept_avg_e.index, sta_sept_avg_e, color=stereo_sept_color, linewidth=linewidth,
-                            label='STEREO/SEPT '+sept_chstring_e+f' {sector}', drawstyle='steps-mid')
+                            label=f'STEREO-A/SEPT {sector} '+sept_chstring_e, drawstyle='steps-mid')
                 elif type(sept_ch_e) == int:
                     ax.plot(sta_sept_df_e.index, sta_sept_df_e[f'ch_{sept_ch_e}'], color=stereo_sept_color,
-                            linewidth=linewidth, label='STEREO/SEPT '+sta_sept_dict_e.loc[sept_ch_e]['ch_strings']+f' {sector}', drawstyle='steps-mid')
+                            linewidth=linewidth, label=f'STEREO-A/SEPT {sector} '+sta_sept_dict_e.loc[sept_ch_e]['ch_strings'], drawstyle='steps-mid')
                 if plot_times:
                     [ax.axvline(i, lw=vlw, color=stereo_sept_color) for i in df_sta_onset_e100]
                     [ax.axvline(i, lw=vlw, ls=':', color=stereo_sept_color) for i in df_sta_peak_e100]
@@ -1134,34 +1188,60 @@ for i in tqdm(range(0, len(dates))):  # standard
         if WIND:
             if len(wind3dp_e_df) > 0:
                 # multiply by 1e6 to get per MeV
-                ax.plot(wind3dp_e_df.index, wind3dp_e_df[f'FLUX_{wind3dp_ch_e}']*1e6, color=wind_color, linewidth=linewidth, label='Wind/3DP '+wind3dp_e_meta['channels_dict_df']['Bins_Text'][wind3dp_ch_e], drawstyle='steps-mid')
+                ax.plot(wind3dp_e_df.index, wind3dp_e_df[f'FLUX_{wind3dp_ch_e}']*1e6, color=wind_color, linewidth=linewidth, label='Wind/3DP omni '+wind3dp_e_meta['channels_dict_df']['Bins_Text'][wind3dp_ch_e], drawstyle='steps-mid')
             if plot_times:
                 [ax.axvline(i, lw=vlw, color=wind_color) for i in df_wind_onset_e100]
                 [ax.axvline(i, lw=vlw, ls=':', color=wind_color) for i in df_wind_peak_e100]
 
+        if add_contaminating_channels:
+            ax2 = ax.twinx()
+
+        if add_bepi_conta_ch:
+            if len(sixs_df) > 0:
+                if len(sixs_df_p_conta) > 0:
+                    ax2.plot(sixs_df_p_conta.index, sixs_df_p_conta.values, color=sixs_color, ls='--', linewidth=linewidth, label=f'BepiColombo/SIXS side {sixs_side} '+sixs_p_conta_en_channel_string, drawstyle='steps-mid')  # +r" $\bf{prot}$"
+
         if add_ept_conta_ch:
             ept_conta_color = solo_ept_color  # 'cyan'
             if len(ept_p) > 0:
-                ax.plot(df_ept_conta_p.index.values, df_ept_conta_p.values, ls='--', linewidth=linewidth, color=ept_conta_color, label='SOLO\nEPT '+ept_conta_chstring_p+f'\n{sector}'+r" $\bf{IONS}$", drawstyle='steps-mid')
+                ax2.plot(df_ept_conta_p.index.values, df_ept_conta_p.values, ls='--', linewidth=linewidth, color=ept_conta_color, label=f'SOLO/EPT {sector} '+ept_conta_chstring_p, drawstyle='steps-mid')  # +'\n'+r" $\bf{IONS}$"
+
+        if add_psp_conta_ch:
+            psp_conta_color = psp_het_color  # 'purple'
+            if len(df_psp_epilo_p) > 0:
+                ax2.plot(df_psp_epilo_p.index.values, df_psp_epilo_p.values, ls='--', linewidth=linewidth, color=psp_conta_color, label=f'PSP ISOIS-EPILO {psp_epilo_viewing}x '+psp_epilo_chstring_p, drawstyle='steps-mid')  # +'\n'+r" $\bf{prot}$"
 
         if add_sept_conta_ch and len(sta_sept_df_p) > 0:
-            # ax.plot(sta_sept_df_p.index, sta_sept_avg_p, color=stereo_sept_color, linewidth=linewidth, label='STEREO/SEPT '+sept_chstring_p+f' {sector}', drawstyle='steps-mid')
+            # ax2.plot(sta_sept_df_p.index, sta_sept_avg_p, color=stereo_sept_color, linewidth=linewidth, label='STEREO/SEPT '+sept_chstring_p+f' {sector}', drawstyle='steps-mid')
             sept_conta_color = stereo_sept_color  # 'brown'
-            ax.plot(sta_sept_df_p.index, sta_sept_df_p['ch_15'], color=sept_conta_color, ls='--', linewidth=linewidth,
-                    label='STEREO/SEPT '+sta_sept_dict_p.loc[15]['ch_strings']+f' {sector}\n'+r"$\bf{IONS}$", drawstyle='steps-mid')
+            ax2.plot(sta_sept_df_p.index, sta_sept_df_p['ch_15'], color=sept_conta_color, ls='--', linewidth=linewidth,
+                    label=f'STEREO-A/SEPT {sector} '+sta_sept_dict_p.loc[15]['ch_strings'], drawstyle='steps-mid')  # +'\n'+r"$\bf{IONS}$"
 
         if add_3dp_conta_ch:
             wind_3dp_conta_ch = 4
             wind_3dp_conta_color = wind_color  # 'darkgreen'
             if len(wind3dp_p_df) > 0:
                 # multiply by 1e6 to get per MeV
-                ax.plot(wind3dp_p_df.index, wind3dp_p_df[f'FLUX_{wind_3dp_conta_ch}']*1e6, color=wind_3dp_conta_color, ls='--', linewidth=linewidth, label='Wind/3DP '+wind3dp_p_meta['channels_dict_df']['Bins_Text'][wind_3dp_conta_ch]+r" $\bf{prot}$", drawstyle='steps-mid')
+                ax2.plot(wind3dp_p_df.index, wind3dp_p_df[f'FLUX_{wind_3dp_conta_ch}']*1e6, color=wind_3dp_conta_color, ls='--', linewidth=linewidth, label='Wind/3DP omni '+wind3dp_p_meta['channels_dict_df']['Bins_Text'][wind_3dp_conta_ch], drawstyle='steps-mid')  # +r" $\bf{prot}$"
 
         # ax.set_ylim(7.9e-3, 4.7e1)
         # ax.set_ylim(0.3842003987966555, 6333.090511873226)
-        ax.set_yscale('log')
+        ax.set_yscale('log')            
         ax.set_ylabel(intensity_label)
         ax.legend(loc='center left', bbox_to_anchor=(1, 0.5), title='100 keV '+species_string)
+
+        if add_contaminating_channels:
+            ax2.set_yscale('log')
+            ax2.get_yaxis().set_visible(False)
+
+            ax_ylim = ax.get_ylim()
+            ax2_ylim = ax2.get_ylim()
+            ax.set_ylim(np.min([ax_ylim[0], ax2_ylim[0]]), np.max([ax_ylim[1], ax2_ylim[1]]))
+            ax2.set_ylim(np.min([ax_ylim[0], ax2_ylim[0]]), np.max([ax_ylim[1], ax2_ylim[1]]))
+
+            ax.legend(loc='upper left', bbox_to_anchor=(1, 1), title='100 keV '+species_string)
+            ax2.legend(loc='lower left', bbox_to_anchor=(1, 0), title='contaminating ions')
+
         axnum = axnum + 1
 
     # 1 MEV ELECTRONS
@@ -1181,7 +1261,8 @@ for i in tqdm(range(0, len(dates))):  # standard
                 #         label='PSP '+r"$\bf{(count\ rates)}$"+'\nISOIS-EPIHI-HET '+psp_het_energies['Electrons_ENERGY_LABL'][psp_het_ch_e][0].replace(' ', '').replace('-', ' - ').replace('MeV', ' MeV')+'\nA (sun)',
                 #         drawstyle='steps-mid')
                 ax.plot(df_psp_het_e.index, df_psp_het_e*10, color=psp_het_color, linewidth=linewidth,
-                        label='PSP '+r"$\bf{(count\ rate\ *10)}$"+'\nISOIS-EPIHI-HET '+psp_het_chstring_e+'\nA (sun)',
+                        # label='PSP '+r"$\bf{(count\ rate\ *10)}$"+'\nISOIS-EPIHI-HET '+psp_het_chstring_e+'\nA (sun)',
+                        label='PSP ISOIS-EPIHI-HET A (sun)\n'+psp_het_chstring_e+r" $\bf{(count\ rate\ *10)}$",
                         drawstyle='steps-mid')
             if plot_times:
                 [ax.axvline(i, lw=vlw, color=psp_het_color) for i in df_psp_onset_e1000]
@@ -1191,13 +1272,13 @@ for i in tqdm(range(0, len(dates))):  # standard
             #         label='Bepi/SIXS '+sixs_chstrings[sixs_ch_e100]+f' side {sixs_side_e}', drawstyle='steps-mid')
             if len(sixs_df) > 0:
                 ax.plot(sixs_df_e1.index, sixs_df_e1, color=sixs_color, linewidth=linewidth,
-                        label='BepiColombo/SIXS '+sixs_e1_en_channel_string+f' side {sixs_side}', drawstyle='steps-mid')
+                        label=f'BepiColombo/SIXS side {sixs_side} '+sixs_e1_en_channel_string, drawstyle='steps-mid')
             if plot_times:
                 [ax.axvline(i, lw=vlw, color=sixs_color) for i in df_bepi_onset_e1000]
                 [ax.axvline(i, lw=vlw, ls=':', color=sixs_color) for i in df_bepi_peak_e1000]
         if SOLO:
             if het and (len(het_e) > 0):
-                ax.plot(df_het_e.index.values, df_het_e.flux, linewidth=linewidth, color=solo_het_color, label='SOLO/HET '+het_chstring_e+f' {sector}', drawstyle='steps-mid')
+                ax.plot(df_het_e.index.values, df_het_e.flux, linewidth=linewidth, color=solo_het_color, label=f'SOLO/HET {sector} '+het_chstring_e+f'', drawstyle='steps-mid')
             if plot_times:
                 [ax.axvline(i, lw=vlw, color=solo_het_color) for i in df_solo_onset_e1000]
                 [ax.axvline(i, lw=vlw, ls=':', color=solo_het_color) for i in df_solo_peak_e1000]
@@ -1205,7 +1286,7 @@ for i in tqdm(range(0, len(dates))):  # standard
             if stereo_het:
                 if len(sta_het_avg_e) > 0:
                     ax.plot(sta_het_avg_e.index, sta_het_avg_e, color=stereo_het_color, linewidth=linewidth,
-                            label='STEREO/HET '+st_het_chstring_e, drawstyle='steps-mid')
+                            label='STEREO-A/HET '+st_het_chstring_e, drawstyle='steps-mid')
             if plot_times:
                 [ax.axvline(i, lw=vlw, color=stereo_het_color) for i in df_sta_onset_e1000]
                 [ax.axvline(i, lw=vlw, ls=':', color=stereo_het_color) for i in df_sta_peak_e1000]
@@ -1238,7 +1319,8 @@ for i in tqdm(range(0, len(dates))):  # standard
                 #         label='PSP '+r"$\bf{(count\ rates)}$"+'\nISOIS-EPIHI-HET '+psp_het_energies['H_ENERGY_LABL'][psp_het_ch_p][0].replace(' ', '').replace('-', ' - ').replace('MeV', ' MeV')+'\nA (sun)',
                 #         drawstyle='steps-mid')
                 ax.plot(df_psp_het_p.index, df_psp_het_p, color=psp_het_color, linewidth=linewidth,
-                        label='PSP '+'\nISOIS-EPIHI-HET '+psp_het_chstring_p+'\nA (sun)',
+                        # label='PSP '+'\nISOIS-EPIHI-HET '+psp_het_chstring_p+'\nA (sun)',
+                        label='PSP ISOIS-EPIHI-HET A (sun)\n'+psp_het_chstring_p,
                         drawstyle='steps-mid')
             if plot_times:
                 [ax.axvline(i, lw=vlw, color=psp_het_color) for i in df_psp_onset_p]
@@ -1246,26 +1328,26 @@ for i in tqdm(range(0, len(dates))):  # standard
         if Bepi:
             # ax.plot(sixs_p.index, sixs_p[sixs_ch_p], color='orange', linewidth=linewidth, label='BepiColombo/SIXS '+sixs_chstrings[sixs_ch_p]+f' side {sixs_side_p}', drawstyle='steps-mid')
             if len(sixs_df) > 0:
-                ax.plot(sixs_df_p25.index, sixs_df_p25, color=sixs_color, linewidth=linewidth, label='BepiColombo/SIXS '+sixs_p25_en_channel_string+f' side {sixs_side}', drawstyle='steps-mid')
+                ax.plot(sixs_df_p25.index, sixs_df_p25, color=sixs_color, linewidth=linewidth, label=f'BepiColombo/SIXS side {sixs_side} '+sixs_p25_en_channel_string, drawstyle='steps-mid')
             if plot_times:
                 [ax.axvline(i, lw=vlw, color=sixs_color) for i in df_bepi_onset_p]
                 [ax.axvline(i, lw=vlw, ls=':', color=sixs_color) for i in df_bepi_peak_p]
         if SOLO:
             if het and (len(ept_e) > 0):
-                ax.plot(df_het_p.index, df_het_p, linewidth=linewidth, color=solo_het_color, label='SOLO/HET '+het_chstring_p+f' {sector}', drawstyle='steps-mid')
+                ax.plot(df_het_p.index, df_het_p, linewidth=linewidth, color=solo_het_color, label=f'SOLO/HET {sector} '+het_chstring_p, drawstyle='steps-mid')
             if plot_times:
                 [ax.axvline(i, lw=vlw, color=solo_het_color) for i in df_solo_onset_p]
                 [ax.axvline(i, lw=vlw, ls=':', color=solo_het_color) for i in df_solo_peak_p]
         if STEREO:
             if sept_p:
                 if type(sept_ch_p) == list and len(sta_sept_avg_p) > 0:
-                    ax.plot(sta_sept_df_p.index, sta_sept_avg_p, color=stereo_sept_color, linewidth=linewidth, label='STEREO/SEPT '+sept_chstring_p+f' {sector}', drawstyle='steps-mid')
+                    ax.plot(sta_sept_df_p.index, sta_sept_avg_p, color=stereo_sept_color, linewidth=linewidth, label=f'STEREO-A/SEPT {sector} '+sept_chstring_p, drawstyle='steps-mid')
                 elif type(sept_ch_p) == int:
-                    ax.plot(sta_sept_df_p.index, sta_sept_df_p[f'ch_{sept_ch_p}'], color=stereo_sept_color, linewidth=linewidth, label='STEREO/SEPT '+sta_sept_dict_p.loc[sept_ch_p]['ch_strings']+f' {sector}', drawstyle='steps-mid')
+                    ax.plot(sta_sept_df_p.index, sta_sept_df_p[f'ch_{sept_ch_p}'], color=stereo_sept_color, linewidth=linewidth, label='STEREO-A/SEPT '+sta_sept_dict_p.loc[sept_ch_p]['ch_strings']+f' {sector}', drawstyle='steps-mid')
             if stereo_het:
                 if len(sta_het_avg_p) > 0:
                     ax.plot(sta_het_avg_p.index, sta_het_avg_p, color=stereo_het_color,
-                            linewidth=linewidth, label='STEREO/HET '+st_het_chstring_p, drawstyle='steps-mid')
+                            linewidth=linewidth, label='STEREO-A/HET '+st_het_chstring_p, drawstyle='steps-mid')
             if let:
                 str_ch = {0: 'P1', 1: 'P2', 2: 'P3', 3: 'P4'}
                 ax.plot(sta_let_df.index, sta_let_df[f'H_unsec_flux_{let_ch}'], color=stereo_let_color, linewidth=linewidth, label='STERE/LET '+let_chstring[let_ch], drawstyle='steps-mid')
