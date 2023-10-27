@@ -358,6 +358,12 @@ def calc_inf_inj_time(input_csv='WP2_multi_sc_catalog - WP2_multi_sc_event_list_
     Example
     -------
     df = calc_inf_inj_time(output_csv='new_inf_inj_times.csv')
+
+    Note
+    ----
+    Full function code should be copied to terminal, then executed there.
+    Afterwards, columns containing inferred injection times as well as solarwind
+    speeds have to be manually copied to the main spreadsheet!
     """
     from seppy.tools import inf_inj_time
     from solarmach import get_sw_speed
