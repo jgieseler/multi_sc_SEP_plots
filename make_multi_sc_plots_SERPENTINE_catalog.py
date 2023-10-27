@@ -21,8 +21,8 @@ from seppy.loader.soho import calc_av_en_flux_ERNE, soho_load
 from seppy.loader.stereo import calc_av_en_flux_HET as calc_av_en_flux_ST_HET
 from seppy.loader.stereo import calc_av_en_flux_SEPT, stereo_load
 from seppy.loader.wind import wind3dp_load
-from seppy.tools import inf_inj_time
-from solarmach import get_sw_speed
+# from seppy.tools import inf_inj_time
+# from solarmach import get_sw_speed
 from solo_epd_loader import combine_channels as calc_av_en_flux_EPD
 from solo_epd_loader import epd_load
 from sunpy.coordinates import frames, get_horizons_coord
@@ -462,6 +462,9 @@ def calc_inf_inj_time(input_csv='WP2_multi_sc_catalog - WP2_multi_sc_event_list_
     -------
     df = calc_inf_inj_time(output_csv='new_inf_inj_times.csv')
     """
+    from seppy.tools import inf_inj_time
+    from tqdm import tqdm
+
     df = pd.read_csv(input_csv)
 
     fixed_mean_energies_p = {'SOLO': np.sqrt(25.09*41.18),
@@ -515,14 +518,17 @@ def calc_inf_inj_time(input_csv='WP2_multi_sc_catalog - WP2_multi_sc_event_list_
         else:
             onset_e100 = dt.datetime.strptime(f'{onset_date_e100_str} {onset_time_e100_str}', '%Y-%m-%d %H:%M:%S')
 
+        print('')
         print(i, mission, onset_p, onset_e1000, onset_e100)
 
         if not type(onset_p) == pd._libs.tslibs.nattype.NaTType:
+            # sw = get_sw_speed(onset_p)  # TODO:
             inj_time_p, distance_p = inf_inj_time(mission_p, onset_p, 'p', fixed_mean_energies_p[mission], sw)
         else:
             inj_time_p = pd.NaT
             distance_p = np.nan
         if not type(onset_e100) == pd._libs.tslibs.nattype.NaTType:
+            # sw = get_sw_speed(onset_e100)  # TODO:
             inj_time_e100, distance_e100 = inf_inj_time(mission_e100, onset_e100, 'e', fixed_mean_energies_e100[mission], sw)
             # use different energy channels for PSP before 14 June 2021:
             if mission == 'PSP' and onset_e100 < dt.datetime(2021, 6, 14):
@@ -531,26 +537,37 @@ def calc_inf_inj_time(input_csv='WP2_multi_sc_catalog - WP2_multi_sc_event_list_
             inj_time_e100 = pd.NaT
             distance_e100 = np.nan
         if not type(onset_e1000) == pd._libs.tslibs.nattype.NaTType:
+            # sw = get_sw_speed(onset_e1000)  # TODO:
             inj_time_e1000, distance_e1000 = inf_inj_time(mission_e1000, onset_e1000, 'e', fixed_mean_energies_e1000[mission], sw)
         else:
             inj_time_e1000 = pd.NaT
             distance_e1000 = np.nan
 
         if not type(inj_time_p) == pd._libs.tslibs.nattype.NaTType:
-            df['p25MeV inferred injection time (HH:MM:SS)'].iloc[i] = inj_time_p.strftime('%H:%M:%S')
-            df['p25MeV inferred injection date (yyyy-mm-dd)'].iloc[i] = inj_time_p.strftime('%Y-%m-%d')
-            df['p25MeV pathlength used for inferred injection time (au)'].iloc[i] = np.round(distance_p.value, 2)
+            # df['p25MeV inferred injection time (HH:MM:SS)'].iloc[i] = inj_time_p.strftime('%H:%M:%S')
+            # df['p25MeV inferred injection date (yyyy-mm-dd)'].iloc[i] = inj_time_p.strftime('%Y-%m-%d')
+            # df['p25MeV pathlength used for inferred injection time (au)'].iloc[i] = np.round(distance_p.value, 2)
+            df.loc[i, 'p25MeV inferred injection time (HH:MM:SS)'] = inj_time_p.strftime('%H:%M:%S')
+            df.loc[i, 'p25MeV inferred injection date (yyyy-mm-dd)'] = inj_time_p.strftime('%Y-%m-%d')
+            df.loc[i, 'p25MeV pathlength used for inferred injection time (au)'] = np.round(distance_p.value, 2)
         if not type(inj_time_e1000) == pd._libs.tslibs.nattype.NaTType:
-            df['e1MeV inferred injection time (HH:MM:SS)'].iloc[i] = inj_time_e1000.strftime('%H:%M:%S')
-            df['e1MeV inferred injection date (yyyy-mm-dd)'].iloc[i] = inj_time_e1000.strftime('%Y-%m-%d')
-            df['e1MeV pathlength used for inferred injection time (au)'].iloc[i] = np.round(distance_e1000.value, 2)
+            # df['e1MeV inferred injection time (HH:MM:SS)'].iloc[i] = inj_time_e1000.strftime('%H:%M:%S')
+            # df['e1MeV inferred injection date (yyyy-mm-dd)'].iloc[i] = inj_time_e1000.strftime('%Y-%m-%d')
+            # df['e1MeV pathlength used for inferred injection time (au)'].iloc[i] = np.round(distance_e1000.value, 2)
+            df.loc[i, 'e1MeV inferred injection time (HH:MM:SS)'] = inj_time_e1000.strftime('%H:%M:%S')
+            df.loc[i, 'e1MeV inferred injection date (yyyy-mm-dd)'] = inj_time_e1000.strftime('%Y-%m-%d')
+            df.loc[i, 'e1MeV pathlength used for inferred injection time (au)'] = np.round(distance_e1000.value, 2)
         if not type(inj_time_e100) == pd._libs.tslibs.nattype.NaTType:
-            df['e100keV inferred injection time (HH:MM:SS)'].iloc[i] = inj_time_e100.strftime('%H:%M:%S')
-            df['e100keV inferred injection date (yyyy-mm-dd)'].iloc[i] = inj_time_e100.strftime('%Y-%m-%d')
-            df['e100keV pathlength used for inferred injection time (au)'].iloc[i] = np.round(distance_e100.value, 2)
+            # df['e100keV inferred injection time (HH:MM:SS)'].iloc[i] = inj_time_e100.strftime('%H:%M:%S')
+            # df['e100keV inferred injection date (yyyy-mm-dd)'].iloc[i] = inj_time_e100.strftime('%Y-%m-%d')
+            # df['e100keV pathlength used for inferred injection time (au)'].iloc[i] = np.round(distance_e100.value, 2)
+            df.loc[i, 'e100keV inferred injection time (HH:MM:SS)'] = inj_time_e100.strftime('%H:%M:%S')
+            df.loc[i, 'e100keV inferred injection date (yyyy-mm-dd)'] = inj_time_e100.strftime('%Y-%m-%d')
+            df.loc[i, 'e100keV pathlength used for inferred injection time (au)'] = np.round(distance_e100.value, 2)
 
     if output_csv:
         df.to_csv(output_csv, index=False)
+        print('')
         print('Note that the format of some columns might have changed in the new csv file! To avoid this copy only the new columns from it, and paste them into your original spreadsheet.')
     return df
 
