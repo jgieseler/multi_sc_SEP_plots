@@ -12,18 +12,22 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import sunpy
-from seppy.tools import inf_inj_time
 from matplotlib.ticker import AutoMinorLocator
 from matplotlib.transforms import blended_transform_factory
-from seppy.loader.psp import calc_av_en_flux_PSP_EPIHI, calc_av_en_flux_PSP_EPILO, psp_isois_load, resample_df
+from seppy.loader.psp import (calc_av_en_flux_PSP_EPIHI,
+                              calc_av_en_flux_PSP_EPILO, psp_isois_load,
+                              resample_df)
 from seppy.loader.soho import calc_av_en_flux_ERNE, soho_load
-from solo_epd_loader import epd_load
-from solo_epd_loader import combine_channels as calc_av_en_flux_EPD
 from seppy.loader.stereo import calc_av_en_flux_HET as calc_av_en_flux_ST_HET
 from seppy.loader.stereo import calc_av_en_flux_SEPT, stereo_load
 from seppy.loader.wind import wind3dp_load
+from seppy.tools import inf_inj_time
+from solarmach import get_sw_speed
+from solo_epd_loader import combine_channels as calc_av_en_flux_EPD
+from solo_epd_loader import epd_load
 from sunpy.coordinates import frames, get_horizons_coord
 from tqdm import tqdm
+
 # import astropy.units as u
 # from cdflib.epochs import CDFepoch
 # from sunpy import log
@@ -795,7 +799,7 @@ for i in tqdm(range(0, len(dates))):  # standard
         if lower_proton:
             psp_het_ch_p = [4]
         psp_epilo_channel = 'F'
-        psp_epilo_channel_p = 'T'  # 'P' or 'T'
+        psp_epilo_channel_p = 'P'  # 'P' or 'T'
         psp_epilo_viewing = 3  # 3="sun", 7="antisun"
         psp_epilo_threshold = None  # 1e2  # None
         # psp_path = '/home/gieseler/uni/psp/data/'
