@@ -1,12 +1,7 @@
-"""
-REQUIRES PANDAS 1.4.4 (resp. crashes with 1.5.x)
-"""
-
 import datetime as dt
 import os
 import warnings
 
-# import cdflib
 import matplotlib.dates as mdates
 import matplotlib.pyplot as plt
 import numpy as np
@@ -21,29 +16,11 @@ from seppy.loader.soho import calc_av_en_flux_ERNE, soho_load
 from seppy.loader.stereo import calc_av_en_flux_HET as calc_av_en_flux_ST_HET
 from seppy.loader.stereo import calc_av_en_flux_SEPT, stereo_load
 from seppy.loader.wind import wind3dp_load
-# from seppy.tools import inf_inj_time
-# from solarmach import get_sw_speed
 from solo_epd_loader import combine_channels as calc_av_en_flux_EPD
 from solo_epd_loader import epd_load
 from sunpy.coordinates import frames, get_horizons_coord
 from tqdm import tqdm
 
-# import astropy.units as u
-# from cdflib.epochs import CDFepoch
-# from sunpy import log
-# from sunpy.net import Fido
-# from sunpy.net import attrs as a
-# from sunpy.timeseries import TimeSeries
-# from sunpy.util.exceptions import warn_user
-
-
-'''
-June 2022
-this loops over the mission time and creates
-multi-sc plots to be used for the SERPENTINE
-multi-sc SEP event catalog
-moved this file to Deepnote June 15 2022
-'''
 
 # make selections
 #############################################################
@@ -132,77 +109,6 @@ plt.rcParams['ytick.major.width'] = 2
 plt.rcParams['ytick.minor.size'] = 5
 plt.rcParams['ytick.minor.width'] = 1
 plt.rcParams['axes.linewidth'] = 2.0
-
-# NOW IMPORTED FROM solo_epd_loader!
-# def calc_av_en_flux_EPD(df, energies, en_channel, species, instrument):  # original from Nina Slack Feb 9, 2022, rewritten Jan Apr 8, 2022
-#     """This function averages the flux of several energy channels of HET into a combined energy channel
-#     channel numbers counted from 0
-
-#     Parameters
-#     ----------
-#     df : pd.DataFrame DataFrame containing HET data
-#         DataFrame containing HET data
-#     energies : dict
-#         Energy dict returned from epd_loader (from Jan)
-#     en_channel : int or list
-#         energy channel number(s) to be used
-#     species : string
-#         'e', 'electrons', 'p', 'i', 'protons', 'ions'
-#     instrument : string
-#         'ept' or 'het'
-
-#     Returns
-#     -------
-#     pd.DataFrame
-#         flux_out: contains channel-averaged flux
-
-#     Raises
-#     ------
-#     Exception
-#         [description]
-#     """
-#     if species.lower() in ['e', 'electrons']:
-#         en_str = energies['Electron_Bins_Text']
-#         bins_width = 'Electron_Bins_Width'
-#         flux_key = 'Electron_Flux'
-#     if species.lower() in ['p', 'protons', 'i', 'ions', 'h']:
-#         if instrument.lower() == 'het':
-#             en_str = energies['H_Bins_Text']
-#             bins_width = 'H_Bins_Width'
-#             flux_key = 'H_Flux'
-#         if instrument.lower() == 'ept':
-#             en_str = energies['Ion_Bins_Text']
-#             bins_width = 'Ion_Bins_Width'
-#             flux_key = 'Ion_Flux'
-#     if type(en_channel) == list:
-#         energy_low = en_str[en_channel[0]][0].split('-')[0]
-
-#         energy_up = en_str[en_channel[-1]][0].split('-')[-1]
-
-#         en_channel_string = energy_low + '-' + energy_up
-
-#         if len(en_channel) > 2:
-#             raise Exception('en_channel must have len 2 or less!')
-#         if len(en_channel) == 2:
-#             DE = energies[bins_width]
-#             try:
-#                 df = df[flux_key]
-#             except (AttributeError, KeyError):
-#                 None
-#             for bins in np.arange(en_channel[0], en_channel[-1]+1):
-#                 if bins == en_channel[0]:
-#                     I_all = df[f'{flux_key}_{bins}'] * DE[bins]
-#                 else:
-#                     I_all = I_all + df[f'{flux_key}_{bins}'] * DE[bins]
-#             DE_total = np.sum(DE[(en_channel[0]):(en_channel[-1]+1)])
-#             flux_out = pd.DataFrame({'flux': I_all/DE_total}, index=df.index)
-#         else:
-#             en_channel = en_channel[0]
-#             flux_out = pd.DataFrame({'flux': df[f'{flux_key}_{en_channel}']}, index=df.index)
-#     else:
-#         flux_out = pd.DataFrame({'flux': df[f'{flux_key}_{en_channel}']}, index=df.index)
-#         en_channel_string = en_str[en_channel]
-#     return flux_out, en_channel_string
 
 
 def bepicolombo_sixs_stack(path, date, side):
@@ -327,12 +233,8 @@ outpath = 'plots'  # '/Users/dresing/Documents/Proposals/SERPENTINE_H2020/Cycle2
 START LOAD ONSET TIMES
 """
 if plot_times:
-    # First you have to manually (!) bring spreadsheet in the same form as the example file!!!
-
-    # Load modified spreadhseet
-    # df = pd.read_csv('WP2_multi-sc_SEP_event_list_D2.3.csv')
+    # Load spreadhseet
     df = pd.read_csv('WP2_multi_sc_catalog - WP2_multi_sc_event_list_draft.csv')
-    # df = pd.read_excel('WP2_multi-sc_SEP_event_list_D2.3.xlsx')
 
     # get list of flare times
     df_flare_date_str = df['flare date (yyyy-mm-dd)'].values.astype(str)
@@ -364,12 +266,10 @@ if plot_times:
         df_solo_onset_p = []
         for i in range(len(df_solo_onset_date_p_str)):
             df_solo_onset_p.append(dt.datetime.strptime(f'{df_solo_onset_date_p_str[i]} {df_solo_onset_time_p_str[i]}', '%Y-%m-%d %H:%M:%S'))
-            # print(f'{df_solo_onset_date_p_str[i]} {df_solo_onset_time_p_str[i]} => {df_solo_onset_p[i]}')
 
         df_solo_peak_p = []
         for i in range(len(df_solo_peak_date_p_str)):
             df_solo_peak_p.append(dt.datetime.strptime(f'{df_solo_peak_date_p_str[i]} {df_solo_peak_time_p_str[i]}', '%Y-%m-%d %H:%M:%S'))
-            # print(f'{df_solo_peak_date_p_str[i]} {df_solo_peak_time_p_str[i]} => {df_solo_peak_p[i]}')
 
         # 100 keV electrons
         df_solo_onset_date_e100_str = df_solo['e100keV onset date (yyyy-mm-dd)'].values.astype(str)
@@ -385,12 +285,10 @@ if plot_times:
         df_solo_onset_e100 = []
         for i in range(len(df_solo_onset_date_e100_str)):
             df_solo_onset_e100.append(dt.datetime.strptime(f'{df_solo_onset_date_e100_str[i]} {df_solo_onset_time_e100_str[i]}', '%Y-%m-%d %H:%M:%S'))
-            # print(f'{df_solo_onset_date_e100_str[i]} {df_solo_onset_time_e100_str[i]} => {df_solo_onset_e100[i]}')
 
         df_solo_peak_e100 = []
         for i in range(len(df_solo_peak_date_e100_str)):
             df_solo_peak_e100.append(dt.datetime.strptime(f'{df_solo_peak_date_e100_str[i]} {df_solo_peak_time_e100_str[i]}', '%Y-%m-%d %H:%M:%S'))
-            # print(f'{df_solo_peak_date_e100_str[i]} {df_solo_peak_time_e100_str[i]} => {df_solo_peak_e100[i]}')
 
         # 1000 keV (1 MeV) electrons
         df_solo_onset_date_e1000_str = df_solo['e1MeV onset date (yyyy-mm-dd)'].values.astype(str)
@@ -406,12 +304,10 @@ if plot_times:
         df_solo_onset_e1000 = []
         for i in range(len(df_solo_onset_date_e1000_str)):
             df_solo_onset_e1000.append(dt.datetime.strptime(f'{df_solo_onset_date_e1000_str[i]} {df_solo_onset_time_e1000_str[i]}', '%Y-%m-%d %H:%M:%S'))
-            # print(f'{df_solo_onset_date_e1000_str[i]} {df_solo_onset_time_e1000_str[i]} => {df_solo_onset_e1000[i]}')
 
         df_solo_peak_e1000 = []
         for i in range(len(df_solo_peak_date_e1000_str)):
             df_solo_peak_e1000.append(dt.datetime.strptime(f'{df_solo_peak_date_e1000_str[i]} {df_solo_peak_time_e1000_str[i]}', '%Y-%m-%d %H:%M:%S'))
-            # print(f'{df_solo_peak_date_e1000_str[i]} {df_solo_peak_time_e1000_str[i]} => {df_solo_peak_e1000[i]}')
 
         return df_solo_onset_p, df_solo_peak_p, df_solo_onset_e100, df_solo_peak_e100, df_solo_onset_e1000, df_solo_peak_e1000
 
@@ -464,6 +360,7 @@ def calc_inf_inj_time(input_csv='WP2_multi_sc_catalog - WP2_multi_sc_event_list_
     df = calc_inf_inj_time(output_csv='new_inf_inj_times.csv')
     """
     from seppy.tools import inf_inj_time
+    from solarmach import get_sw_speed
     from tqdm import tqdm
 
     df = pd.read_csv(input_csv)
@@ -520,21 +417,23 @@ def calc_inf_inj_time(input_csv='WP2_multi_sc_catalog - WP2_multi_sc_event_list_
             onset_e100 = dt.datetime.strptime(f'{onset_date_e100_str} {onset_time_e100_str}', '%Y-%m-%d %H:%M:%S')
 
         if not type(onset_p) == pd._libs.tslibs.nattype.NaTType:
-            sw_p = get_sw_speed(body=mission_p, dtime=onset_p, trange=1, default_vsw=sw)
-            if np.isnan(sw_p):
-                sw_p = sw
-            else:
+            sw_p = get_sw_speed(body=mission_p, dtime=onset_p, trange=1, default_vsw=0)
+            if not np.isnan(sw_p) and not sw_p==0:
                 sw_p = int(sw_p)
+                df.loc[i, 'p25MeV onset solar wind speed (km/s)'] = sw_p
+            if np.isnan(sw_p) or sw_p==0:
+                sw_p = sw
             inj_time_p, distance_p = inf_inj_time(mission_p, onset_p, 'p', fixed_mean_energies_p[mission], sw_p)
         else:
             inj_time_p = pd.NaT
             distance_p = np.nan
         if not type(onset_e100) == pd._libs.tslibs.nattype.NaTType:
-            sw_e100 = get_sw_speed(body=mission_e100, dtime=onset_e100, trange=1, default_vsw=sw)
-            if np.isnan(sw_e100):
-                sw_e100 = sw
-            else:
+            sw_e100 = get_sw_speed(body=mission_e100, dtime=onset_e100, trange=1, default_vsw=0)
+            if not np.isnan(sw_e100) and not sw_e100==0:
                 sw_e100 = int(sw_e100)
+                df.loc[i, 'e100keV onset solar wind speed (km/s)'] = sw_e100
+            if np.isnan(sw_e100) or sw_e100==0:
+                sw_e100 = sw
             inj_time_e100, distance_e100 = inf_inj_time(mission_e100, onset_e100, 'e', fixed_mean_energies_e100[mission], sw_e100)
             # use different energy channels for PSP before 14 June 2021:
             if mission == 'PSP' and onset_e100 < dt.datetime(2021, 6, 14):
@@ -543,11 +442,12 @@ def calc_inf_inj_time(input_csv='WP2_multi_sc_catalog - WP2_multi_sc_event_list_
             inj_time_e100 = pd.NaT
             distance_e100 = np.nan
         if not type(onset_e1000) == pd._libs.tslibs.nattype.NaTType:
-            sw_e1000 = get_sw_speed(body=mission_e1000, dtime=onset_e1000, trange=1, default_vsw=sw)
-            if np.isnan(sw_e1000):
-                sw_e1000 = sw
-            else:
+            sw_e1000 = get_sw_speed(body=mission_e1000, dtime=onset_e1000, trange=1, default_vsw=0)
+            if not np.isnan(sw_e1000) and not sw_e1000==0:
                 sw_e1000 = int(sw_e1000)
+                df.loc[i, 'e1MeV onset solar wind speed (km/s)'] = sw_e1000
+            elif np.isnan(sw_e1000) or sw_e1000==0:
+                sw_e1000 = sw
             inj_time_e1000, distance_e1000 = inf_inj_time(mission_e1000, onset_e1000, 'e', fixed_mean_energies_e1000[mission], sw_e1000)
         else:
             inj_time_e1000 = pd.NaT
@@ -563,7 +463,6 @@ def calc_inf_inj_time(input_csv='WP2_multi_sc_catalog - WP2_multi_sc_event_list_
             df.loc[i, 'p25MeV inferred injection time (HH:MM:SS)'] = inj_time_p.strftime('%H:%M:%S')
             df.loc[i, 'p25MeV inferred injection date (yyyy-mm-dd)'] = inj_time_p.strftime('%Y-%m-%d')
             df.loc[i, 'p25MeV pathlength used for inferred injection time (au)'] = np.round(distance_p.value, 2)
-            df.loc[i, 'sw_p'] = sw_p
         if not type(inj_time_e1000) == pd._libs.tslibs.nattype.NaTType:
             # df['e1MeV inferred injection time (HH:MM:SS)'].iloc[i] = inj_time_e1000.strftime('%H:%M:%S')
             # df['e1MeV inferred injection date (yyyy-mm-dd)'].iloc[i] = inj_time_e1000.strftime('%Y-%m-%d')
@@ -571,7 +470,6 @@ def calc_inf_inj_time(input_csv='WP2_multi_sc_catalog - WP2_multi_sc_event_list_
             df.loc[i, 'e1MeV inferred injection time (HH:MM:SS)'] = inj_time_e1000.strftime('%H:%M:%S')
             df.loc[i, 'e1MeV inferred injection date (yyyy-mm-dd)'] = inj_time_e1000.strftime('%Y-%m-%d')
             df.loc[i, 'e1MeV pathlength used for inferred injection time (au)'] = np.round(distance_e1000.value, 2)
-            df.loc[i, 'sw_e1000'] = sw_e1000
         if not type(inj_time_e100) == pd._libs.tslibs.nattype.NaTType:
             # df['e100keV inferred injection time (HH:MM:SS)'].iloc[i] = inj_time_e100.strftime('%H:%M:%S')
             # df['e100keV inferred injection date (yyyy-mm-dd)'].iloc[i] = inj_time_e100.strftime('%Y-%m-%d')
@@ -579,7 +477,6 @@ def calc_inf_inj_time(input_csv='WP2_multi_sc_catalog - WP2_multi_sc_event_list_
             df.loc[i, 'e100keV inferred injection time (HH:MM:SS)'] = inj_time_e100.strftime('%H:%M:%S')
             df.loc[i, 'e100keV inferred injection date (yyyy-mm-dd)'] = inj_time_e100.strftime('%Y-%m-%d')
             df.loc[i, 'e100keV pathlength used for inferred injection time (au)'] = np.round(distance_e100.value, 2)
-            df.loc[i, 'sw_e100'] = sw_e100
 
     if output_csv:
         df.to_csv(output_csv, index=False)
@@ -644,6 +541,8 @@ def get_sc_coords(input_csv='WP2_multi_sc_catalog - WP2_multi_sc_event_list_draf
 """
 START PLOT PEAK FLUXES VS DATES
 """
+# This is just for testing purposes!
+
 plot_peak_vs_time = False
 if plot_peak_vs_time:
     fig, ax = plt.subplots(figsize=(10, 6))
