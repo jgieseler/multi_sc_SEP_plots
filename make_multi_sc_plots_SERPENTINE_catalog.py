@@ -556,9 +556,9 @@ def get_sc_coords(input_csv='WP2_multi_sc_catalog - WP2_multi_sc_event_list_draf
 
             # convert from Stonyhurst to Carrington and obtain individual coords:
             sc_coords = sc_coords.transform_to(frames.HeliographicCarrington(observer='Sun'))
-            df['S/C distance (au)'].loc[row] = np.round(sc_coords.radius.value, 2)
-            df['S/C Carrington longitude (deg)'].loc[row] = np.round(sc_coords.lon.value, 0).astype(int)
-            df['S/C Carrington latitude (deg)'].loc[row] = np.round(sc_coords.lat.value, 0).astype(int)
+            df.loc[row, 'S/C distance (au)'] = np.round(sc_coords.radius.value, 2)
+            df.loc[row, 'S/C Carrington longitude (deg)'] = np.round(sc_coords.lon.value, 0).astype(int)
+            df.loc[row, 'S/C Carrington latitude (deg)'] = np.round(sc_coords.lat.value, 0).astype(int)
     df['S/C Carrington longitude (deg)'] = df['S/C Carrington longitude (deg)'].astype(pd.Int64Dtype())
     df['S/C Carrington latitude (deg)'] = df['S/C Carrington latitude (deg)'].astype(pd.Int64Dtype())
     if output_csv:
