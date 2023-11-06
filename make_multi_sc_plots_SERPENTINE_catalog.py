@@ -29,7 +29,7 @@ from tqdm import tqdm
 mode = 'events'
 
 lower_proton = False  # True if 13 MeV protons should be used instead of 25+ MeV
-add_contaminating_channels = True
+add_contaminating_channels = False
 
 if add_contaminating_channels:
     add_sept_conta_ch = True  # True if contaminaiting STEREO-A/SEPT ion channel (ch 15) should be added to the 100 keV electron panel
@@ -83,6 +83,9 @@ wind3dp_e = True
 
 # plot vertical lines with previously found onset and peak times
 plot_times = True
+
+# plot vertical lines with previously found shock times provided by https://parker.gsfc.nasa.gov/shocks.html
+plot_shock_times = True
 #############################################################
 
 # omit some warnings
@@ -333,6 +336,26 @@ if plot_times:
         all_onset_dates_first.append(all_onsets[np.where(all_onset_dates_org == date)[0][0]])
 """
 END LOAD ONSET TIMES
+"""
+
+
+"""
+START LOAD SHOCK TIMES
+"""
+if plot_shock_times:
+    # Load json file
+    df_shocks = pd.read_json('shocks.json')
+    df_shocks['datetime'] = pd.to_datetime(df_shocks['STRTIME'], format='%Y-%m-%d %H:%M:%S')
+    shock_colors = {'FF': 'blueviolet',
+                    'FR': 'blueviolet',
+                    'SF': 'blueviolet',
+                    'SR': 'blueviolet'
+                    }
+    # if plot_shock_times:
+    #     for i in df_shocks.index:
+    #         ax.axvline(df_shocks['datetime'].iloc[i], lw=vlw, color=shock_colors[df_shocks['TYPE'].iloc[i]])
+"""
+END LOAD SHOCK TIMES
 """
 
 
@@ -655,6 +678,9 @@ for i in tqdm(range(0, len(dates))):  # standard
     if mode == 'events':
         startdate = dt.datetime.fromisoformat(dates[i].isoformat()) - pd.Timedelta('5h')
         plot_period = ('48h')
+        if plot_shock_times:
+            plot_period = ('72h')
+            print('Plotting PSP shock times, extending plot range to 72h.')
     enddate = startdate + pd.Timedelta(plot_period)
     outfile = f'{outpath}{os.sep}multi_sc_plot_{startdate.date()}_{plot_period}_{averaging}-av.png'
     if mode == 'events':
@@ -1184,6 +1210,19 @@ for i in tqdm(range(0, len(dates))):  # standard
             ax.legend(loc='upper left', bbox_to_anchor=(1, 1), title='100 keV '+species_string)
             ax2.legend(loc='lower left', bbox_to_anchor=(1, 0), title='contaminating ions')
 
+        if plot_shock_times:
+            trans = blended_transform_factory(x_transform=ax.transData, y_transform=ax.transAxes)
+            for i in df_shocks.index:
+                ax.axvline(df_shocks['datetime'].iloc[i], lw=vlw, color=shock_colors[df_shocks['TYPE'].iloc[i]])
+
+                # ind = np.where((np.array(df_shocks['datetime'].iloc[i]) < enddate) & (np.array(df_shocks['datetime'].iloc[i]) > startdate))
+                if (np.array(df_shocks['datetime'].iloc[i]) < enddate) & (np.array(df_shocks['datetime'].iloc[i]) > startdate):
+                    ax.annotate(str(df_shocks['TYPE'].iloc[i]),
+                                xy=[mdates.date2num(df_shocks['datetime'].iloc[i]), 1.0], xycoords=trans,
+                                xytext=[mdates.date2num(df_shocks['datetime'].iloc[i]), 1.02], textcoords=trans,
+                                # arrowprops=dict(arrowstyle="->", lw=2), 
+                                horizontalalignment='center')
+
         axnum = axnum + 1
 
     # 1 MEV ELECTRONS
@@ -1246,6 +1285,11 @@ for i in tqdm(range(0, len(dates))):  # standard
         ax.set_yscale('log')
         ax.set_ylabel(intensity_label)
         ax.legend(loc='center left', bbox_to_anchor=(1, 0.5), title='1 MeV '+species_string)
+
+        if plot_shock_times:
+            for i in df_shocks.index:
+                ax.axvline(df_shocks['datetime'].iloc[i], lw=vlw, color=shock_colors[df_shocks['TYPE'].iloc[i]])
+
         axnum = axnum + 1
 
     # PROTONS
@@ -1318,6 +1362,11 @@ for i in tqdm(range(0, len(dates))):  # standard
         ax.legend(loc='center left', bbox_to_anchor=(1, 0.5), title='>25 MeV Protons/Ions')
         if lower_proton:
             ax.legend(loc='center left', bbox_to_anchor=(1, 0.5), title='14 MeV Protons/Ions')
+
+        if plot_shock_times:
+            for i in df_shocks.index:
+                ax.axvline(df_shocks['datetime'].iloc[i], lw=vlw, color=shock_colors[df_shocks['TYPE'].iloc[i]])
+
         axnum = axnum+1
     # pos = get_horizons_coord('Solar Orbiter', startdate, 'id')
     # dist = np.round(pos.radius.value, 2)
