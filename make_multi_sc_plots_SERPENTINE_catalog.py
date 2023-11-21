@@ -541,7 +541,7 @@ def get_sc_coords(input_csv='WP2_multi_sc_catalog - WP2_multi_sc_event_list_draf
         # only execute if ALL S/C coords are nan (i.e., empty):
         # if np.all([np.isnan(ds['S/C distance (au)']), np.isnan(ds['S/C Carrington longitude (deg)']), np.isnan(ds['S/C Carrington latitude (deg)'])]):
         print(row)
-        if type(ds['Solar-MACH link']) == str:
+        if type(ds['Solar-MACH link']) is str:
             for n in ds['Solar-MACH link'].split('&'):
                 if n.startswith('date='):
                     date = n.split('=')[-1]  # %Y%m%d
@@ -563,6 +563,65 @@ def get_sc_coords(input_csv='WP2_multi_sc_catalog - WP2_multi_sc_event_list_draf
     df['S/C Carrington latitude (deg)'] = df['S/C Carrington latitude (deg)'].astype(pd.Int64Dtype())
     if output_csv:
         df.to_csv(output_csv, index=False)
+        print('Note that the format of some columns might have changed in the new csv file! To avoid this copy only the new columns from it, and paste them into your original spreadsheet.')
+    return df
+
+
+def get_sep_angle(input_csv='WP2_multi_sc_catalog - WP2_multi_sc_event_list_draft.csv', output_csv=False, default_vsw=400.0):
+    """
+    Obtains separation angle (and all other Solar-MACH info) for datetime defined in Solar-MACH link amd flare location from DataFrame
+
+    Parameters
+    ----------
+    input_csv : string
+        File name of csv file to read in. If not a full path, file is expected in the working directory.
+    output_csv : boolean or string (optional)
+        File name of new csv file to save. If not a full path, file is saved in the working directory.
+
+    Returns
+    -------
+    df: pd.DataFrame
+        Updated DataFrame with obtained spacecraft coordinates
+
+    Example
+    -------
+    df = get_sep_angle(output_csv='new_sc_coords.csv')
+    """
+    from solarmach import SolarMACH
+    df = pd.read_csv(input_csv)
+    # loop over all rows:
+    for row in tqdm(range(len(df))):
+        ds = df.loc[row]  # get pd.Series of single row
+        if type(ds['Solar-MACH link']) is str:
+            for n in ds['Solar-MACH link'].split('&'):
+                if n.startswith('date='):
+                    date = n.split('=')[-1]  # %Y%m%d
+                if n.startswith('time='):
+                    time = n.split('=')[-1]  # %H%M
+            datetime = dt.datetime.strptime(date + time, '%Y%m%d%H%M')
+            # use L1 coords for SOHO/Wind:
+            if ds['Observer'] == 'L1 (SOHO/Wind)':
+                # body_list = ['SEMB-L1']
+                body_list = ['Wind']
+            else:
+                body_list = [ds['Observer']]
+
+            if not np.isnan(ds['flare Carrington longitude']):
+                sm = SolarMACH(date=datetime,
+                               body_list=body_list,
+                               reference_long=ds['flare Carrington longitude'],
+                               reference_lat=ds['flare Carrington latitude'],
+                               coord_sys='Carrington',
+                               default_vsw=default_vsw)
+                sep_angle = sm.coord_table["Longitudinal separation between body's mangetic footpoint and reference_long"].values  # TODO: Edit typo when fixed in solarmach
+                if len(sep_angle) == 1:
+                    df.loc[row, "Longitudinal separation between SC magnetic footpoint and flare"] = np.round(sep_angle[0], 0).astype(int)
+                else:
+                    print('Something is wrong...')
+
+    if output_csv:
+        df.to_csv(output_csv, index=False)
+        print('')
         print('Note that the format of some columns might have changed in the new csv file! To avoid this copy only the new columns from it, and paste them into your original spreadsheet.')
     return df
 
@@ -1097,7 +1156,7 @@ for i in tqdm(range(0, len(dates))):  # standard
         species_string = 'Electrons'
         if ept_use_corr_e:
             species_string = 'Electrons (corrected)'
-        
+
         # plot flare times with arrows on top
         if mode == 'events':
             trans = blended_transform_factory(x_transform=ax.transData, y_transform=ax.transAxes)
@@ -1194,7 +1253,7 @@ for i in tqdm(range(0, len(dates))):  # standard
 
         # ax.set_ylim(7.9e-3, 4.7e1)
         # ax.set_ylim(0.3842003987966555, 6333.090511873226)
-        ax.set_yscale('log')            
+        ax.set_yscale('log')
         ax.set_ylabel(intensity_label)
         ax.legend(loc='center left', bbox_to_anchor=(1, 0.5), title='100 keV '+species_string)
 
@@ -1220,7 +1279,7 @@ for i in tqdm(range(0, len(dates))):  # standard
                     ax.annotate(str(df_shocks['TYPE'].iloc[i]),
                                 xy=[mdates.date2num(df_shocks['datetime'].iloc[i]), 1.0], xycoords=trans,
                                 xytext=[mdates.date2num(df_shocks['datetime'].iloc[i]), 1.02], textcoords=trans,
-                                # arrowprops=dict(arrowstyle="->", lw=2), 
+                                # arrowprops=dict(arrowstyle="->", lw=2),
                                 horizontalalignment='center')
 
         axnum = axnum + 1
