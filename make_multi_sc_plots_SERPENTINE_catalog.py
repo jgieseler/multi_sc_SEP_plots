@@ -592,13 +592,8 @@ def get_sep_angle(input_csv='WP2_multi_sc_catalog - WP2_multi_sc_event_list_draf
     # loop over all rows:
     for row in tqdm(range(len(df))):
         ds = df.loc[row]  # get pd.Series of single row
-        if type(ds['Solar-MACH link']) is str:
-            for n in ds['Solar-MACH link'].split('&'):
-                if n.startswith('date='):
-                    date = n.split('=')[-1]  # %Y%m%d
-                if n.startswith('time='):
-                    time = n.split('=')[-1]  # %H%M
-            datetime = dt.datetime.strptime(date + time, '%Y%m%d%H%M')
+        if type(ds['flare date (yyyy-mm-dd)']) is str and type(ds['flare time (HH:MM:SS)']) is str:
+            datetime = dt.datetime.strptime(ds['flare date (yyyy-mm-dd)'] + ds['flare time (HH:MM:SS)'], '%Y-%m-%d%H:%M:%S')
             # use L1 coords for SOHO/Wind:
             if ds['Observer'] == 'L1 (SOHO/Wind)':
                 # body_list = ['SEMB-L1']
