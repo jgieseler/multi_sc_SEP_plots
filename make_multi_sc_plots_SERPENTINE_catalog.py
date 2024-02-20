@@ -16,6 +16,7 @@ from seppy.loader.soho import calc_av_en_flux_ERNE, soho_load
 from seppy.loader.stereo import calc_av_en_flux_HET as calc_av_en_flux_ST_HET
 from seppy.loader.stereo import calc_av_en_flux_SEPT, stereo_load
 from seppy.loader.wind import wind3dp_load
+from seppy.util import bepi_sixs_load, calc_av_en_flux_sixs
 from solo_epd_loader import combine_channels as calc_av_en_flux_EPD
 from solo_epd_loader import epd_load
 from sunpy.coordinates import frames, get_horizons_coord
@@ -114,110 +115,114 @@ plt.rcParams['ytick.minor.width'] = 1
 plt.rcParams['axes.linewidth'] = 2.0
 
 
-def bepicolombo_sixs_stack(path, date, side):
-    # def bepicolombo_sixs_stack(path, date, side, species):
-
-    # side is the index of the file here
-    try:
-        try:
-            filename = f"{path}/sixs_phys_data_{date}_side{side}.csv"
-            df = pd.read_csv(filename)
-        except FileNotFoundError:
-            # try alternative file name format
-            filename = f"{path}/{date.strftime('%Y%m%d')}_side{side}.csv"
-            df = pd.read_csv(filename)
-            times = pd.to_datetime(df['TimeUTC'])
-
-        # list comprehension because the method can't be applied onto the array "times"
-        times = [t.tz_convert(None) for t in times]
-        df.index = np.array(times)
-        df = df.drop(columns=['TimeUTC'])
-
-        # choose the subset of desired particle species
-        # if species=="ion":
-        #     df = df[[f"P{i}" for i in range(1,10)]]
-        # if species=="ele":
-        #     df = df[[f"E{i}" for i in range(1,8)]]
-
-    except FileNotFoundError:
-        print(f'Unable to open {filename}')
-        df = pd.DataFrame()
-        filename = ''
-
-    return df, filename
-
-
-def bepi_sixs_load(startdate, enddate, side, path):
-    dates = pd.date_range(startdate, enddate)
-
-    # read files into Pandas dataframes:
-    df, file = bepicolombo_sixs_stack(path, startdate, side=side)
-    if len(dates) > 1:
-        for date in dates[1:]:
-            t_df, file = bepicolombo_sixs_stack(path, date.date(), side=side)
-            df = pd.concat([df, t_df])
-
-    channels_dict = {"Energy_Bin_str": {'E1': '71 keV', 'E2': '106 keV', 'E3': '169 keV', 'E4': '280 keV', 'E5': '960 keV', 'E6': '2240 keV', 'E7': '8170 keV',
-                                        'P1': '1.1 MeV', 'P2': '1.2 MeV', 'P3': '1.5 MeV', 'P4': '2.3 MeV', 'P5': '4.0 MeV', 'P6': '8.0 MeV', 'P7': '14.5 MeV', 'P8': '25.1 MeV', 'P9': '37.3 MeV'},
-                     "Electron_Bins_Low_Energy": np.array([55, 78, 134, 235, 1000, 1432, 4904]),
-                     "Electron_Bins_High_Energy": np.array([92, 143, 214, 331, 1193, 3165, 10000]),
-                     "Ion_Bins_Low_Energy": np.array([0.001, 1.088, 1.407, 2.139, 3.647, 7.533, 13.211, 22.606, 29.246]),
-                     "Ion_Bins_High_Energy": np.array([1.254, 1.311, 1.608, 2.388, 4.241, 8.534, 15.515, 28.413, 40.0])}
-    return df, channels_dict
-
-
-def calc_av_en_flux_sixs(df, meta, channel, species):
-    """
-    This function averages the flux of two energy channels of BepiColombo/SIXS into a combined energy channel
-    channel numbers counted from 1
-
-    Parameters
-    ----------
-    df : pd.DataFrame
-        DataFrame containing HET data
-    channel : int or list
-        energy channel or list with first and last channel to be used
-    species : string
-        'e', 'electrons', 'p', 'protons'
-
-    Returns
-    -------
-    flux: pd.DataFrame
-        channel-averaged flux
-    en_channel_string: str
-        string containing the energy information of combined channel
-    """
-
-    # define constant geometric factors
-    GEOMFACTOR_PROT8 = 5.97E-01
-    GEOMFACTOR_PROT9 = 4.09E+00
-    GEOMFACTOR_ELEC5 = 1.99E-02
-    GEOMFACTOR_ELEC6 = 1.33E-01
-    GEOMFACTOR_PROT_COMB89 = 3.34
-    GEOMFACTOR_ELEC_COMB56 = 0.0972
-
-    if type(channel) == list and len(channel) == 1:
-        channel = channel[0]
-
-    if species in ['p', 'protons']:
-        if channel == [8, 9]:
-            countrate = df['P8'] * GEOMFACTOR_PROT8 + df['P9'] * GEOMFACTOR_PROT9
-            flux = countrate / GEOMFACTOR_PROT_COMB89
-            en_channel_string = '37 MeV'
-        else:
-            flux = df[f'P{channel}']
-            en_channel_string = sixs_meta['Energy_Bin_str'][f'P{channel}']
-
-    if species in ['e', 'electrons']:
-        if channel == [5, 6]:
-            countrate = df['E5'] * GEOMFACTOR_ELEC5 + df['E6'] * GEOMFACTOR_ELEC6
-            flux = countrate / GEOMFACTOR_ELEC_COMB56
-            en_channel_string = '1.4 MeV'
-        else:
-            flux = df[f'E{channel}']
-            en_channel_string = sixs_meta['Energy_Bin_str'][f'E{channel}']
-
-    return flux, en_channel_string
+"""
+Import latest version of bepi_sixs_load, bepicolombo_sixs_stack, and 
+calc_av_en_flux_sixs from seppy.util
+"""
+# def bepicolombo_sixs_stack(path, date, side):
+#     # def bepicolombo_sixs_stack(path, date, side, species):
+#
+#     # side is the index of the file here
+#     try:
+#         try:
+#             filename = f"{path}/sixs_phys_data_{date}_side{side}.csv"
+#             df = pd.read_csv(filename)
+#         except FileNotFoundError:
+#             # try alternative file name format
+#             filename = f"{path}/{date.strftime('%Y%m%d')}_side{side}.csv"
+#             df = pd.read_csv(filename)
+#             times = pd.to_datetime(df['TimeUTC'])
+#
+#         # list comprehension because the method can't be applied onto the array "times"
+#         times = [t.tz_convert(None) for t in times]
+#         df.index = np.array(times)
+#         df = df.drop(columns=['TimeUTC'])
+#
+#         # choose the subset of desired particle species
+#         # if species=="ion":
+#         #     df = df[[f"P{i}" for i in range(1,10)]]
+#         # if species=="ele":
+#         #     df = df[[f"E{i}" for i in range(1,8)]]
+#
+#     except FileNotFoundError:
+#         print(f'Unable to open {filename}')
+#         df = pd.DataFrame()
+#         filename = ''
+#
+#     return df, filename
+#
+#
+# def bepi_sixs_load(startdate, enddate, side, path):
+#     dates = pd.date_range(startdate, enddate)
+#
+#     # read files into Pandas dataframes:
+#     df, file = bepicolombo_sixs_stack(path, startdate, side=side)
+#     if len(dates) > 1:
+#         for date in dates[1:]:
+#             t_df, file = bepicolombo_sixs_stack(path, date.date(), side=side)
+#             df = pd.concat([df, t_df])
+#
+#     channels_dict = {"Energy_Bin_str": {'E1': '71 keV', 'E2': '106 keV', 'E3': '169 keV', 'E4': '280 keV', 'E5': '960 keV', 'E6': '2240 keV', 'E7': '8170 keV',
+#                                         'P1': '1.1 MeV', 'P2': '1.2 MeV', 'P3': '1.5 MeV', 'P4': '2.3 MeV', 'P5': '4.0 MeV', 'P6': '8.0 MeV', 'P7': '14.5 MeV', 'P8': '25.1 MeV', 'P9': '37.3 MeV'},
+#                      "Electron_Bins_Low_Energy": np.array([55, 78, 134, 235, 1000, 1432, 4904]),
+#                      "Electron_Bins_High_Energy": np.array([92, 143, 214, 331, 1193, 3165, 10000]),
+#                      "Ion_Bins_Low_Energy": np.array([0.001, 1.088, 1.407, 2.139, 3.647, 7.533, 13.211, 22.606, 29.246]),
+#                      "Ion_Bins_High_Energy": np.array([1.254, 1.311, 1.608, 2.388, 4.241, 8.534, 15.515, 28.413, 40.0])}
+#     return df, channels_dict
+#
+#
+# def calc_av_en_flux_sixs(df, meta, channel, species):
+#     """
+#     This function averages the flux of two energy channels of BepiColombo/SIXS into a combined energy channel
+#     channel numbers counted from 1
+#
+#     Parameters
+#     ----------
+#     df : pd.DataFrame
+#         DataFrame containing HET data
+#     channel : int or list
+#         energy channel or list with first and last channel to be used
+#     species : string
+#         'e', 'electrons', 'p', 'protons'
+#
+#     Returns
+#     -------
+#     flux: pd.DataFrame
+#         channel-averaged flux
+#     en_channel_string: str
+#         string containing the energy information of combined channel
+#     """
+#
+#     # define constant geometric factors
+#     GEOMFACTOR_PROT8 = 5.97E-01
+#     GEOMFACTOR_PROT9 = 4.09E+00
+#     GEOMFACTOR_ELEC5 = 1.99E-02
+#     GEOMFACTOR_ELEC6 = 1.33E-01
+#     GEOMFACTOR_PROT_COMB89 = 3.34
+#     GEOMFACTOR_ELEC_COMB56 = 0.0972
+#
+#     if type(channel) is list and len(channel) == 1:
+#         channel = channel[0]
+#
+#     if species in ['p', 'protons']:
+#         if channel == [8, 9]:
+#             countrate = df['P8'] * GEOMFACTOR_PROT8 + df['P9'] * GEOMFACTOR_PROT9
+#             flux = countrate / GEOMFACTOR_PROT_COMB89
+#             en_channel_string = '37 MeV'
+#         else:
+#             flux = df[f'P{channel}']
+#             en_channel_string = sixs_meta['Energy_Bin_str'][f'P{channel}']
+#
+#     if species in ['e', 'electrons']:
+#         if channel == [5, 6]:
+#             countrate = df['E5'] * GEOMFACTOR_ELEC5 + df['E6'] * GEOMFACTOR_ELEC6
+#             flux = countrate / GEOMFACTOR_ELEC_COMB56
+#             en_channel_string = '1.4 MeV'
+#         else:
+#             flux = df[f'E{channel}']
+#             en_channel_string = sixs_meta['Energy_Bin_str'][f'E{channel}']
+#
+#     return flux, en_channel_string
 
 
 # some plot options
