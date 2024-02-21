@@ -30,7 +30,7 @@ from tqdm import tqdm
 mode = 'events'
 
 lower_proton = False  # True if 13 MeV protons should be used instead of 25+ MeV
-add_contaminating_channels = False
+add_contaminating_channels = True
 
 if add_contaminating_channels:
     add_sept_conta_ch = True  # True if contaminaiting STEREO-A/SEPT ion channel (ch 15) should be added to the 100 keV electron panel
@@ -116,7 +116,7 @@ plt.rcParams['axes.linewidth'] = 2.0
 
 
 """
-Import latest version of bepi_sixs_load, bepicolombo_sixs_stack, and 
+Import latest version of bepi_sixs_load, bepicolombo_sixs_stack, and
 calc_av_en_flux_sixs from seppy.util
 """
 # def bepicolombo_sixs_stack(path, date, side):
@@ -431,42 +431,42 @@ def calc_inf_inj_time(input_csv='WP2_multi_sc_catalog - WP2_multi_sc_event_list_
 
         onset_date_p_str = df['p25MeV onset date (yyyy-mm-dd)'].iloc[i]
         onset_time_p_str = df['p25MeV onset time (HH:MM:SS)'].iloc[i]
-        if type(onset_date_p_str) != str or type(onset_time_p_str) != str:
+        if type(onset_date_p_str) is not str or type(onset_time_p_str) is not str:
             onset_p = pd.NaT
         else:
             onset_p = dt.datetime.strptime(f'{onset_date_p_str} {onset_time_p_str}', '%Y-%m-%d %H:%M:%S')
 
         onset_date_e1000_str = df['e1MeV onset date (yyyy-mm-dd)'].iloc[i]
         onset_time_e1000_str = df['e1MeV onset time (HH:MM:SS)'].iloc[i]
-        if type(onset_date_e1000_str) != str or type(onset_time_e1000_str) != str:
+        if type(onset_date_e1000_str) is not str or type(onset_time_e1000_str) is not str:
             onset_e1000 = pd.NaT
         else:
             onset_e1000 = dt.datetime.strptime(f'{onset_date_e1000_str} {onset_time_e1000_str}', '%Y-%m-%d %H:%M:%S')
 
         onset_date_e100_str = df['e100keV onset date (yyyy-mm-dd)'].iloc[i]
         onset_time_e100_str = df['e100keV onset time (HH:MM:SS)'].iloc[i]
-        if type(onset_date_e100_str) != str or type(onset_time_e100_str) != str:
+        if type(onset_date_e100_str) is not str or type(onset_time_e100_str) is not str:
             onset_e100 = pd.NaT
         else:
             onset_e100 = dt.datetime.strptime(f'{onset_date_e100_str} {onset_time_e100_str}', '%Y-%m-%d %H:%M:%S')
 
-        if not type(onset_p) == pd._libs.tslibs.nattype.NaTType:
+        if not type(onset_p) is pd._libs.tslibs.nattype.NaTType:
             sw_p = get_sw_speed(body=mission_p, dtime=onset_p, trange=1, default_vsw=0)
-            if not np.isnan(sw_p) and not sw_p==0:
+            if not np.isnan(sw_p) and not sw_p == 0:
                 sw_p = int(sw_p)
                 df.loc[i, 'p25MeV onset solar wind speed (km/s)'] = sw_p
-            if np.isnan(sw_p) or sw_p==0:
+            if np.isnan(sw_p) or sw_p == 0:
                 sw_p = sw
             inj_time_p, distance_p = inf_inj_time(mission_p, onset_p, 'p', fixed_mean_energies_p[mission], sw_p)
         else:
             inj_time_p = pd.NaT
             distance_p = np.nan
-        if not type(onset_e100) == pd._libs.tslibs.nattype.NaTType:
+        if not type(onset_e100) is pd._libs.tslibs.nattype.NaTType:
             sw_e100 = get_sw_speed(body=mission_e100, dtime=onset_e100, trange=1, default_vsw=0)
-            if not np.isnan(sw_e100) and not sw_e100==0:
+            if not np.isnan(sw_e100) and not sw_e100 == 0:
                 sw_e100 = int(sw_e100)
                 df.loc[i, 'e100keV onset solar wind speed (km/s)'] = sw_e100
-            if np.isnan(sw_e100) or sw_e100==0:
+            if np.isnan(sw_e100) or sw_e100 == 0:
                 sw_e100 = sw
             inj_time_e100, distance_e100 = inf_inj_time(mission_e100, onset_e100, 'e', fixed_mean_energies_e100[mission], sw_e100)
             # use different energy channels for PSP before 14 June 2021:
@@ -475,12 +475,12 @@ def calc_inf_inj_time(input_csv='WP2_multi_sc_catalog - WP2_multi_sc_event_list_
         else:
             inj_time_e100 = pd.NaT
             distance_e100 = np.nan
-        if not type(onset_e1000) == pd._libs.tslibs.nattype.NaTType:
+        if not type(onset_e1000) is pd._libs.tslibs.nattype.NaTType:
             sw_e1000 = get_sw_speed(body=mission_e1000, dtime=onset_e1000, trange=1, default_vsw=0)
-            if not np.isnan(sw_e1000) and not sw_e1000==0:
+            if not np.isnan(sw_e1000) and not sw_e1000 == 0:
                 sw_e1000 = int(sw_e1000)
                 df.loc[i, 'e1MeV onset solar wind speed (km/s)'] = sw_e1000
-            elif np.isnan(sw_e1000) or sw_e1000==0:
+            elif np.isnan(sw_e1000) or sw_e1000 == 0:
                 sw_e1000 = sw
             inj_time_e1000, distance_e1000 = inf_inj_time(mission_e1000, onset_e1000, 'e', fixed_mean_energies_e1000[mission], sw_e1000)
         else:
@@ -490,21 +490,21 @@ def calc_inf_inj_time(input_csv='WP2_multi_sc_catalog - WP2_multi_sc_event_list_
         print('')
         print(i, mission, onset_p, onset_e1000, onset_e100, sw_p, sw_e1000, sw_e100)
 
-        if not type(inj_time_p) == pd._libs.tslibs.nattype.NaTType:
+        if not type(inj_time_p) is pd._libs.tslibs.nattype.NaTType:
             # df['p25MeV inferred injection time (HH:MM:SS)'].iloc[i] = inj_time_p.strftime('%H:%M:%S')
             # df['p25MeV inferred injection date (yyyy-mm-dd)'].iloc[i] = inj_time_p.strftime('%Y-%m-%d')
             # df['p25MeV pathlength used for inferred injection time (au)'].iloc[i] = np.round(distance_p.value, 2)
             df.loc[i, 'p25MeV inferred injection time (HH:MM:SS)'] = inj_time_p.strftime('%H:%M:%S')
             df.loc[i, 'p25MeV inferred injection date (yyyy-mm-dd)'] = inj_time_p.strftime('%Y-%m-%d')
             df.loc[i, 'p25MeV pathlength used for inferred injection time (au)'] = np.round(distance_p.value, 2)
-        if not type(inj_time_e1000) == pd._libs.tslibs.nattype.NaTType:
+        if not type(inj_time_e1000) is pd._libs.tslibs.nattype.NaTType:
             # df['e1MeV inferred injection time (HH:MM:SS)'].iloc[i] = inj_time_e1000.strftime('%H:%M:%S')
             # df['e1MeV inferred injection date (yyyy-mm-dd)'].iloc[i] = inj_time_e1000.strftime('%Y-%m-%d')
             # df['e1MeV pathlength used for inferred injection time (au)'].iloc[i] = np.round(distance_e1000.value, 2)
             df.loc[i, 'e1MeV inferred injection time (HH:MM:SS)'] = inj_time_e1000.strftime('%H:%M:%S')
             df.loc[i, 'e1MeV inferred injection date (yyyy-mm-dd)'] = inj_time_e1000.strftime('%Y-%m-%d')
             df.loc[i, 'e1MeV pathlength used for inferred injection time (au)'] = np.round(distance_e1000.value, 2)
-        if not type(inj_time_e100) == pd._libs.tslibs.nattype.NaTType:
+        if not type(inj_time_e100) is pd._libs.tslibs.nattype.NaTType:
             # df['e100keV inferred injection time (HH:MM:SS)'].iloc[i] = inj_time_e100.strftime('%H:%M:%S')
             # df['e100keV inferred injection date (yyyy-mm-dd)'].iloc[i] = inj_time_e100.strftime('%Y-%m-%d')
             # df['e100keV pathlength used for inferred injection time (au)'].iloc[i] = np.round(distance_e100.value, 2)
@@ -918,10 +918,10 @@ for i in tqdm(range(0, len(dates))):  # standard
         if add_psp_conta_ch:
             print('loading PSP/EPILO IC proton data')
             psp_epilo_p, psp_epilo_p_energies = psp_isois_load('PSP_ISOIS-EPILO_L2-IC',
-                                                        startdate, enddate,
-                                                        epilo_channel=psp_epilo_channel_p,
-                                                        epilo_threshold=None,
-                                                        path=psp_path, resample=None)
+                                                               startdate, enddate,
+                                                               epilo_channel=psp_epilo_channel_p,
+                                                               epilo_threshold=None,
+                                                               path=psp_path, resample=None)
 
     if SOLO:
         data_product = 'l2'
@@ -1009,28 +1009,28 @@ for i in tqdm(range(0, len(dates))):  # standard
 
     if STEREO:
         if sept_e:
-            if type(sept_ch_e) == list and len(sta_sept_df_e) > 0:
+            if type(sept_ch_e) is list and len(sta_sept_df_e) > 0:
                 sta_sept_avg_e, sept_chstring_e = calc_av_en_flux_SEPT(sta_sept_df_e, sta_sept_dict_e, sept_ch_e)
             else:
                 sta_sept_avg_e = []
                 sept_chstring_e = ''
 
         if sept_p:
-            if type(sept_ch_p) == list and len(sta_sept_df_p) > 0:
+            if type(sept_ch_p) is list and len(sta_sept_df_p) > 0:
                 sta_sept_avg_p, sept_chstring_p = calc_av_en_flux_SEPT(sta_sept_df_p, sta_sept_dict_p, sept_ch_p)
             else:
                 sta_sept_avg_p = []
                 sept_chstring_p = ''
 
         if stereo_het:
-            if type(st_het_ch_e) == list and len(sta_het_df) > 0:
+            if type(st_het_ch_e) is list and len(sta_het_df) > 0:
                 sta_het_avg_e, st_het_chstring_e = calc_av_en_flux_ST_HET(sta_het_df.filter(like='Electron'),
                                                                           sta_het_meta['channels_dict_df_e'],
                                                                           st_het_ch_e, species='e')
             else:
                 sta_het_avg_e = []
                 st_het_chstring_e = ''
-            if type(st_het_ch_p) == list and len(sta_het_df) > 0:
+            if type(st_het_ch_p) is list and len(sta_het_df) > 0:
                 sta_het_avg_p, st_het_chstring_p = calc_av_en_flux_ST_HET(sta_het_df.filter(like='Proton'),
                                                                           sta_het_meta['channels_dict_df_p'],
                                                                           st_het_ch_p, species='p')
@@ -1039,7 +1039,7 @@ for i in tqdm(range(0, len(dates))):  # standard
                 st_het_chstring_p = ''
     if SOHO:
         if erne:
-            if type(erne_p_ch) == list and len(soho_erne) > 0:
+            if type(erne_p_ch) is list and len(soho_erne) > 0:
                 soho_erne_avg_p, soho_erne_chstring_p = calc_av_en_flux_ERNE(soho_erne.filter(like='PH_'),
                                                                              erne_energies['channels_dict_df_p'],
                                                                              erne_p_ch,
@@ -1127,7 +1127,7 @@ for i in tqdm(range(0, len(dates))):  # standard
                                                                                  chan=psp_epilo_channel_p,
                                                                                  viewing=psp_epilo_viewing_p)
                 if isinstance(psp_epilo_resample, str):
-                        df_psp_epilo_p = resample_df(df_psp_epilo_p, psp_epilo_resample)
+                    df_psp_epilo_p = resample_df(df_psp_epilo_p, psp_epilo_resample)
 
     ##########################################################################################
 
@@ -1197,10 +1197,10 @@ for i in tqdm(range(0, len(dates))):  # standard
                 [ax.axvline(i, lw=vlw, ls=':', color=solo_ept_color) for i in df_solo_peak_e100]
         if STEREO:
             if sept_e:
-                if type(sept_ch_e) == list and len(sta_sept_avg_e) > 0:
+                if type(sept_ch_e) is list and len(sta_sept_avg_e) > 0:
                     ax.plot(sta_sept_avg_e.index, sta_sept_avg_e, color=stereo_sept_color, linewidth=linewidth,
                             label=f'STEREO-A/SEPT {sector} '+sept_chstring_e, drawstyle='steps-mid')
-                elif type(sept_ch_e) == int:
+                elif type(sept_ch_e) is int:
                     ax.plot(sta_sept_df_e.index, sta_sept_df_e[f'ch_{sept_ch_e}'], color=stereo_sept_color,
                             linewidth=linewidth, label=f'STEREO-A/SEPT {sector} '+sta_sept_dict_e.loc[sept_ch_e]['ch_strings'], drawstyle='steps-mid')
                 if plot_times:
@@ -1242,7 +1242,7 @@ for i in tqdm(range(0, len(dates))):  # standard
             # ax2.plot(sta_sept_df_p.index, sta_sept_avg_p, color=stereo_sept_color, linewidth=linewidth, label='STEREO/SEPT '+sept_chstring_p+f' {sector}', drawstyle='steps-mid')
             sept_conta_color = stereo_sept_color  # 'brown'
             ax2.plot(sta_sept_df_p.index, sta_sept_df_p['ch_15'], color=sept_conta_color, ls='--', linewidth=linewidth,
-                    label=f'STEREO-A/SEPT {sector} '+sta_sept_dict_p.loc[15]['ch_strings'], drawstyle='steps-mid')  # +'\n'+r"$\bf{IONS}$"
+                     label=f'STEREO-A/SEPT {sector} '+sta_sept_dict_p.loc[15]['ch_strings'], drawstyle='steps-mid')  # +'\n'+r"$\bf{IONS}$"
 
         if add_3dp_conta_ch:
             wind_3dp_conta_ch = 4
@@ -1318,7 +1318,7 @@ for i in tqdm(range(0, len(dates))):  # standard
                 [ax.axvline(i, lw=vlw, ls=':', color=sixs_color) for i in df_bepi_peak_e1000]
         if SOLO:
             if het and (len(het_e) > 0):
-                ax.plot(df_het_e.index.values, df_het_e.flux, linewidth=linewidth, color=solo_het_color, label=f'SOLO/HET {sector} '+het_chstring_e+f'', drawstyle='steps-mid')
+                ax.plot(df_het_e.index.values, df_het_e.flux, linewidth=linewidth, color=solo_het_color, label=f'SOLO/HET {sector} '+het_chstring_e+'', drawstyle='steps-mid')
             if plot_times:
                 [ax.axvline(i, lw=vlw, color=solo_het_color) for i in df_solo_onset_e1000]
                 [ax.axvline(i, lw=vlw, ls=':', color=solo_het_color) for i in df_solo_peak_e1000]
@@ -1385,9 +1385,9 @@ for i in tqdm(range(0, len(dates))):  # standard
                 [ax.axvline(i, lw=vlw, ls=':', color=solo_het_color) for i in df_solo_peak_p]
         if STEREO:
             if sept_p:
-                if type(sept_ch_p) == list and len(sta_sept_avg_p) > 0:
+                if type(sept_ch_p) is list and len(sta_sept_avg_p) > 0:
                     ax.plot(sta_sept_df_p.index, sta_sept_avg_p, color=stereo_sept_color, linewidth=linewidth, label=f'STEREO-A/SEPT {sector} '+sept_chstring_p, drawstyle='steps-mid')
-                elif type(sept_ch_p) == int:
+                elif type(sept_ch_p) is int:
                     ax.plot(sta_sept_df_p.index, sta_sept_df_p[f'ch_{sept_ch_p}'], color=stereo_sept_color, linewidth=linewidth, label='STEREO-A/SEPT '+sta_sept_dict_p.loc[sept_ch_p]['ch_strings']+f' {sector}', drawstyle='steps-mid')
             if stereo_het:
                 if len(sta_het_avg_p) > 0:
@@ -1401,9 +1401,9 @@ for i in tqdm(range(0, len(dates))):  # standard
                 [ax.axvline(i, lw=vlw, ls=':', color=stereo_het_color) for i in df_sta_peak_p]
         if SOHO:
             if erne:
-                if type(erne_p_ch) == list and len(soho_erne) > 0:
+                if type(erne_p_ch) is list and len(soho_erne) > 0:
                     ax.plot(soho_erne_avg_p.index, soho_erne_avg_p, color=soho_erne_color, linewidth=linewidth, label='SOHO/ERNE/HED '+soho_erne_chstring_p, drawstyle='steps-mid')
-                elif type(erne_p_ch) == int:
+                elif type(erne_p_ch) is int:
                     if len(soho_erne) > 0:
                         ax.plot(soho_erne.index, soho_erne[f'PH_{erne_p_ch}'], color=soho_erne_color, linewidth=linewidth, label='SOHO/ERNE/HED '+erne_chstring[erne_p_ch], drawstyle='steps-mid')
             # if ephin_p:
