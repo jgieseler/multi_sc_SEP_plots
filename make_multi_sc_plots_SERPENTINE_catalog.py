@@ -86,7 +86,7 @@ wind3dp_e = True
 plot_times = True
 
 # plot vertical lines with previously found shock times provided by https://parker.gsfc.nasa.gov/shocks.html
-plot_shock_times = True
+plot_shock_times = False
 #############################################################
 
 # omit some warnings
@@ -639,7 +639,7 @@ def get_sep_angle(input_csv='WP2_multi_sc_catalog - WP2_multi_sc_event_list_draf
                                reference_lat=ds['flare Carrington latitude'],
                                coord_sys='Carrington',
                                default_vsw=default_vsw)
-                sep_angle = sm.coord_table["Longitudinal separation between body's mangetic footpoint and reference_long"].values  # TODO: Edit typo when fixed in solarmach
+                sep_angle = sm.coord_table["Longitudinal separation between body's magnetic footpoint and reference_long"].values  # TODO: Edit typo when fixed in solarmach -- DONE 2024/02/22
                 if len(sep_angle) == 1:
                     df.loc[row, "Longitudinal separation between SC magnetic footpoint and flare"] = np.round(sep_angle[0], 0).astype(int)
                 else:
@@ -1074,9 +1074,9 @@ for i in tqdm(range(0, len(dates))):  # standard
     if Bepi:
         if len(sixs_df) > 0:
             # 1 MeV electrons:
-            sixs_df_e1, sixs_e1_en_channel_string = calc_av_en_flux_sixs(sixs_df_e, sixs_meta, sixs_ch_e1, 'e')
+            sixs_df_e1, sixs_e1_en_channel_string = calc_av_en_flux_sixs(sixs_df_e, sixs_ch_e1, 'e')
             # >25 MeV protons:
-            sixs_df_p25, sixs_p25_en_channel_string = calc_av_en_flux_sixs(sixs_df_p, sixs_meta, sixs_ch_p, 'p')
+            sixs_df_p25, sixs_p25_en_channel_string = calc_av_en_flux_sixs(sixs_df_p, sixs_ch_p, 'p')
             # 100 keV electrons withouth averaging:
             sixs_df_e100 = sixs_df_e[f'E{sixs_ch_e100}']
             sixs_e100_en_channel_string = sixs_meta['Energy_Bin_str'][f'E{sixs_ch_e100}']
@@ -1241,7 +1241,7 @@ for i in tqdm(range(0, len(dates))):  # standard
         if WIND:
             if len(wind3dp_e_df) > 0:
                 # multiply by 1e6 to get per MeV
-                ax.plot(wind3dp_e_df.index, wind3dp_e_df[f'FLUX_{wind3dp_ch_e}']*1e6, color=wind_color, linewidth=linewidth, label='Wind/3DP omni '+wind3dp_e_meta['channels_dict_df']['Bins_Text'][wind3dp_ch_e], drawstyle='steps-mid')
+                ax.plot(wind3dp_e_df.index, wind3dp_e_df[f'FLUX_{wind3dp_ch_e}']*1e6, color=wind_color, linewidth=linewidth, label='Wind/3DP omni '+wind3dp_e_meta['channels_dict_df']['Bins_Text'].iloc[wind3dp_ch_e], drawstyle='steps-mid')
             if plot_times:
                 [ax.axvline(i, lw=vlw, color=wind_color) for i in df_wind_onset_e100]
                 [ax.axvline(i, lw=vlw, ls=':', color=wind_color) for i in df_wind_peak_e100]
@@ -1275,7 +1275,7 @@ for i in tqdm(range(0, len(dates))):  # standard
             wind_3dp_conta_color = wind_color  # 'darkgreen'
             if len(wind3dp_p_df) > 0:
                 # multiply by 1e6 to get per MeV
-                ax2.plot(wind3dp_p_df.index, wind3dp_p_df[f'FLUX_{wind_3dp_conta_ch}']*1e6, color=wind_3dp_conta_color, ls='--', linewidth=linewidth, label='Wind/3DP omni '+wind3dp_p_meta['channels_dict_df']['Bins_Text'][wind_3dp_conta_ch], drawstyle='steps-mid')  # +r" $\bf{prot}$"
+                ax2.plot(wind3dp_p_df.index, wind3dp_p_df[f'FLUX_{wind_3dp_conta_ch}']*1e6, color=wind_3dp_conta_color, ls='--', linewidth=linewidth, label='Wind/3DP omni '+wind3dp_p_meta['channels_dict_df']['Bins_Text'].iloc[wind_3dp_conta_ch], drawstyle='steps-mid')  # +r" $\bf{prot}$"
 
         # ax.set_ylim(7.9e-3, 4.7e1)
         # ax.set_ylim(0.3842003987966555, 6333.090511873226)
