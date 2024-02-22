@@ -364,7 +364,7 @@ END LOAD SHOCK TIMES
 """
 
 
-def calc_inf_inj_time(input_csv='WP2_multi_sc_catalog - WP2_multi_sc_event_list_draft.csv', output_csv=False, sw=400):
+def calc_inf_inj_time(input_csv='WP2_multi_sc_catalog - WP2_multi_sc_event_list_draft.csv', output_csv=False, sw=400, clean_df=True):
     """
     Calculates inferred injection times from catalogue csv file.
 
@@ -377,6 +377,12 @@ def calc_inf_inj_time(input_csv='WP2_multi_sc_catalog - WP2_multi_sc_event_list_
     sw : integer
         Solar wind speed in km/s used for the calculation if automatically
         obtaining measurements doesn't yield results.
+    clean_df : Boolean
+        If True, initially delete columns that will be populate in this function; that is for each species XX:
+        - 'XX onset solar wind speed (km/s)'
+        - 'XX inferred injection time (HH:MM:SS)'
+        - 'XX inferred injection date (yyyy-mm-dd)'
+        - 'XX pathlength used for inferred injection time (au)'
 
     Returns
     -------
@@ -395,9 +401,24 @@ def calc_inf_inj_time(input_csv='WP2_multi_sc_catalog - WP2_multi_sc_event_list_
     """
     from seppy.tools import inf_inj_time
     from solarmach import get_sw_speed
+    from sunpy import log
     from tqdm import tqdm
 
+    # surpress the INFO message at each get_horizons_coord call
+    log.setLevel('WARNING')
+
     df = pd.read_csv(input_csv)
+
+    if clean_df:
+        for spec in ['p25MeV', 'e100keV', 'e1MeV']:
+            for col in [f'{spec} onset solar wind speed (km/s)', f'{spec} inferred injection time (HH:MM:SS)',
+                        f'{spec} inferred injection date (yyyy-mm-dd)', f'{spec} pathlength used for inferred injection time (au)']:
+                try:
+                    # NOT dropping the column so that column order is unchanged. instead, overwrite all entries with ""
+                    # df.drop(labels=col, axis=1, inplace=True)
+                    df[col] = ""
+                except KeyError as err:
+                    print(err)
 
     fixed_mean_energies_p = {'SOLO': np.sqrt(25.09*41.18),
                              'PSP': np.sqrt(26.91*38.05),
@@ -417,6 +438,11 @@ def calc_inf_inj_time(input_csv='WP2_multi_sc_catalog - WP2_multi_sc_event_list_
                                 'L1 (SOHO/Wind)': np.sqrt(75.63*140.46)/1000.,
                                 'BepiColombo': 0.106
                                 }
+
+    print('')
+    print("Note: In the following output, the info 'assuming default Vsw value of 0 km/s' is inaccurate.")
+    print(f"This is just an intermediate step, in the end the value {sw} will be used.")
+    print('')
 
     for i in tqdm(range(df.shape[0])):
         mission = df['Observer'].iloc[i]
@@ -487,8 +513,8 @@ def calc_inf_inj_time(input_csv='WP2_multi_sc_catalog - WP2_multi_sc_event_list_
             inj_time_e1000 = pd.NaT
             distance_e1000 = np.nan
 
-        print('')
-        print(i, mission, onset_p, onset_e1000, onset_e100, sw_p, sw_e1000, sw_e100)
+        # print('')
+        # print(i, mission, onset_p, onset_e1000, onset_e100, sw_p, sw_e1000, sw_e100)
 
         if not type(inj_time_p) is pd._libs.tslibs.nattype.NaTType:
             # df['p25MeV inferred injection time (HH:MM:SS)'].iloc[i] = inj_time_p.strftime('%H:%M:%S')
