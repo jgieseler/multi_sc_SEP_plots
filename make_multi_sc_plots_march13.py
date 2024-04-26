@@ -40,8 +40,8 @@ moved this file to Deepnote June 15 2022
 
 # first_date = dt.datetime(2021, 4, 17)
 # last_date = dt.datetime(2021, 4, 19)
-startdate = dt.datetime(2023, 3, 13, 00, 00)
-enddate = dt.datetime(2023, 3, 16, 23, 59)
+startdate = dt.datetime(2023, 3, 13, 0, 0)
+enddate = dt.datetime(2023, 3, 15, 23, 59)
 plot_period = '60h'
 averaging = '20min'  # '5min'  # None
 
@@ -287,7 +287,7 @@ plot_e_100 = False
 plot_e_1 = True
 plot_p = True
 save_fig = True
-outpath = 'plots/march_13'  # '/Users/dresing/Documents/Proposals/SERPENTINE_H2020/Cycle25_Multi-SC_SEP_Event_List/Multi_sc_plots'
+outpath = 'plots/'  # '/Users/dresing/Documents/Proposals/SERPENTINE_H2020/Cycle25_Multi-SC_SEP_Event_List/Multi_sc_plots'
 
 # dates = pd.date_range(start=first_date, end=last_date, freq=plot_period)
 # startdate = dates[i].to_pydatetime()

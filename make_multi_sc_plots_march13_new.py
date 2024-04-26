@@ -18,7 +18,7 @@ from seppy.loader.stereo import calc_av_en_flux_SEPT, stereo_load
 from seppy.loader.wind import wind3dp_load
 from seppy.util import bepi_sixs_load, calc_av_en_flux_sixs
 from solo_epd_loader import combine_channels as calc_av_en_flux_EPD
-from solo_epd_loader import epd_load
+from solo_epd_loader import epd_load, calc_ept_corrected_e
 from sunpy.coordinates import frames, get_horizons_coord
 from tqdm import tqdm
 
@@ -27,10 +27,16 @@ from tqdm import tqdm
 #############################################################
 
 # processing mode: 'regular' (e.g. weekly) or 'events'
-mode = 'events'
+mode = 'regular'
 
-lower_proton = False  # True if 13 MeV protons should be used instead of 25+ MeV
+lower_proton = True  # True if 13 MeV protons should be used instead of 25+ MeV
 add_contaminating_channels = False
+
+# skip low-energy e for Bepi
+skip_bepi_e100 = False
+
+# use 400 keV instead of 100 keV electrons
+higher_e100 = True
 
 if add_contaminating_channels:
     add_sept_conta_ch = True  # True if contaminaiting STEREO-A/SEPT ion channel (ch 15) should be added to the 100 keV electron panel
@@ -47,16 +53,16 @@ else:
     add_bepi_conta_ch = False  # True if contaminaiting Bepi/SIXS ion channel (XXX) should be added to the 100 keV electron panel
 
 if mode == 'regular':
-    first_date = dt.datetime(2022, 8, 27)
-    last_date = dt.datetime(2022, 8, 30)
-    plot_period = '7D'
-    averaging = '1h'  # '5min'  # None
+    first_date = dt.datetime(2023, 3, 13, 0, 0)  # dt.datetime(2022, 8, 27)
+    last_date = dt.datetime(2023, 3, 15, 23, 59)  # dt.datetime(2022, 8, 30)
+    plot_period = '60h'  # '7D'
+    averaging = '20min'  # '1h'  # '5min'  # None
 
 if mode == 'events':
     averaging = '20min'  # '5min' None
 
 Bepi = True
-PSP = True
+PSP = False
 SOHO = True
 SOLO = True
 STEREO = True
@@ -71,7 +77,7 @@ ephin_e = True  # not included yet!
 # SOLO:
 ept = True
 het = True
-ept_use_corr_e = False  # not included yet!
+ept_use_corr_e = False
 
 # STEREO:
 sept_e = True
@@ -83,7 +89,7 @@ wind3dp_p = False
 wind3dp_e = True
 
 # plot vertical lines with previously found onset and peak times
-plot_times = True
+plot_times = False
 
 # plot vertical lines with previously found shock times provided by https://parker.gsfc.nasa.gov/shocks.html
 plot_shock_times = False
@@ -119,115 +125,11 @@ plt.rcParams['axes.linewidth'] = 2.0
 Import latest version of bepi_sixs_load, bepicolombo_sixs_stack, and
 calc_av_en_flux_sixs from seppy.util
 """
-# def bepicolombo_sixs_stack(path, date, side):
-#     # def bepicolombo_sixs_stack(path, date, side, species):
-#
-#     # side is the index of the file here
-#     try:
-#         try:
-#             filename = f"{path}/sixs_phys_data_{date}_side{side}.csv"
-#             df = pd.read_csv(filename)
-#         except FileNotFoundError:
-#             # try alternative file name format
-#             filename = f"{path}/{date.strftime('%Y%m%d')}_side{side}.csv"
-#             df = pd.read_csv(filename)
-#             times = pd.to_datetime(df['TimeUTC'])
-#
-#         # list comprehension because the method can't be applied onto the array "times"
-#         times = [t.tz_convert(None) for t in times]
-#         df.index = np.array(times)
-#         df = df.drop(columns=['TimeUTC'])
-#
-#         # choose the subset of desired particle species
-#         # if species=="ion":
-#         #     df = df[[f"P{i}" for i in range(1,10)]]
-#         # if species=="ele":
-#         #     df = df[[f"E{i}" for i in range(1,8)]]
-#
-#     except FileNotFoundError:
-#         print(f'Unable to open {filename}')
-#         df = pd.DataFrame()
-#         filename = ''
-#
-#     return df, filename
-#
-#
-# def bepi_sixs_load(startdate, enddate, side, path):
-#     dates = pd.date_range(startdate, enddate)
-#
-#     # read files into Pandas dataframes:
-#     df, file = bepicolombo_sixs_stack(path, startdate, side=side)
-#     if len(dates) > 1:
-#         for date in dates[1:]:
-#             t_df, file = bepicolombo_sixs_stack(path, date.date(), side=side)
-#             df = pd.concat([df, t_df])
-#
-#     channels_dict = {"Energy_Bin_str": {'E1': '71 keV', 'E2': '106 keV', 'E3': '169 keV', 'E4': '280 keV', 'E5': '960 keV', 'E6': '2240 keV', 'E7': '8170 keV',
-#                                         'P1': '1.1 MeV', 'P2': '1.2 MeV', 'P3': '1.5 MeV', 'P4': '2.3 MeV', 'P5': '4.0 MeV', 'P6': '8.0 MeV', 'P7': '14.5 MeV', 'P8': '25.1 MeV', 'P9': '37.3 MeV'},
-#                      "Electron_Bins_Low_Energy": np.array([55, 78, 134, 235, 1000, 1432, 4904]),
-#                      "Electron_Bins_High_Energy": np.array([92, 143, 214, 331, 1193, 3165, 10000]),
-#                      "Ion_Bins_Low_Energy": np.array([0.001, 1.088, 1.407, 2.139, 3.647, 7.533, 13.211, 22.606, 29.246]),
-#                      "Ion_Bins_High_Energy": np.array([1.254, 1.311, 1.608, 2.388, 4.241, 8.534, 15.515, 28.413, 40.0])}
-#     return df, channels_dict
-#
-#
-# def calc_av_en_flux_sixs(df, meta, channel, species):
-#     """
-#     This function averages the flux of two energy channels of BepiColombo/SIXS into a combined energy channel
-#     channel numbers counted from 1
-#
-#     Parameters
-#     ----------
-#     df : pd.DataFrame
-#         DataFrame containing HET data
-#     channel : int or list
-#         energy channel or list with first and last channel to be used
-#     species : string
-#         'e', 'electrons', 'p', 'protons'
-#
-#     Returns
-#     -------
-#     flux: pd.DataFrame
-#         channel-averaged flux
-#     en_channel_string: str
-#         string containing the energy information of combined channel
-#     """
-#
-#     # define constant geometric factors
-#     GEOMFACTOR_PROT8 = 5.97E-01
-#     GEOMFACTOR_PROT9 = 4.09E+00
-#     GEOMFACTOR_ELEC5 = 1.99E-02
-#     GEOMFACTOR_ELEC6 = 1.33E-01
-#     GEOMFACTOR_PROT_COMB89 = 3.34
-#     GEOMFACTOR_ELEC_COMB56 = 0.0972
-#
-#     if type(channel) is list and len(channel) == 1:
-#         channel = channel[0]
-#
-#     if species in ['p', 'protons']:
-#         if channel == [8, 9]:
-#             countrate = df['P8'] * GEOMFACTOR_PROT8 + df['P9'] * GEOMFACTOR_PROT9
-#             flux = countrate / GEOMFACTOR_PROT_COMB89
-#             en_channel_string = '37 MeV'
-#         else:
-#             flux = df[f'P{channel}']
-#             en_channel_string = sixs_meta['Energy_Bin_str'][f'P{channel}']
-#
-#     if species in ['e', 'electrons']:
-#         if channel == [5, 6]:
-#             countrate = df['E5'] * GEOMFACTOR_ELEC5 + df['E6'] * GEOMFACTOR_ELEC6
-#             flux = countrate / GEOMFACTOR_ELEC_COMB56
-#             en_channel_string = '1.4 MeV'
-#         else:
-#             flux = df[f'E{channel}']
-#             en_channel_string = sixs_meta['Energy_Bin_str'][f'E{channel}']
-#
-#     return flux, en_channel_string
 
 
 # some plot options
 intensity_label = 'Flux\n/(s cm² sr MeV)'
-linewidth = 1.5
+linewidth = 3
 vlw = 2.5  # linewidth for vertical lines (default 2)
 outpath = None  # os.getcwd()
 plot_e_100 = True
@@ -339,21 +241,6 @@ if plot_times:
     all_onset_dates_first = []
     for i, date in enumerate(all_onset_dates):
         all_onset_dates_first.append(all_onsets[np.where(all_onset_dates_org == date)[0][0]])
-
-    #
-    # TODO: Verify in the future that the following works! (2024-04-24)
-
-    # get list of event dates from original spreadsheet column 'Event start date (yyyy-mm-dd)'
-    event_list = list(set(df['Event start date (yyyy-mm-dd)'].values))
-    event_list.sort()
-    event_list_dt = [dt.datetime.strptime(ev, "%Y-%m-%d").date() for ev in event_list]
-
-    # clean all_onset_dates_first for duplicate events
-    all_onset_dates_first2 = []
-    for d in all_onset_dates_first:
-        if d.date() in event_list_dt:
-            all_onset_dates_first2.append(d)
-    all_onset_dates_first = all_onset_dates_first2
 """
 END LOAD ONSET TIMES
 """
@@ -376,28 +263,6 @@ if plot_shock_times:
     #         ax.axvline(df_shocks['datetime'].iloc[i], lw=vlw, color=shock_colors[df_shocks['TYPE'].iloc[i]])
 """
 END LOAD SHOCK TIMES
-"""
-
-
-"""
-Create event time list for SEPserver
-"""
-# Needs plot_times=True to create list 'all_onset_dates_first' above!
-if plot_times:
-    # negative_offset = pd.Timedelta('5h')  # set to '0h' to disable
-    plot_period = ('72h')
-
-    df_sepserver = pd.DataFrame({'start': all_onset_dates_first})
-    # df_sepserver['start'] = df_sepserver['start'] - negative_offset
-    df_sepserver['stop'] = df_sepserver['start'] + pd.Timedelta(plot_period)
-
-    df_sepserver.to_csv('sepserver.csv', sep=',', index=False, header=False)
-
-    """
-    Removed those events that are not in the official public list yet afterwards from csv file.
-    """
-"""
-End Create event time list for SEPserver
 """
 
 
@@ -800,7 +665,7 @@ if mode == 'regular':
 if mode == 'events':
     dates = all_onset_dates_first
 # for startdate in tqdm(dates.to_pydatetime()):  # not in use any more
-for i in tqdm(range(0, len(dates))):  # standard
+for i in tqdm(range(0, 1)):  # standard
     # for i in tqdm(range(7, len(dates))):
     # for i in tqdm([3, 25, 27, 30, 32, 34, 41, 43, 48]):  # replot some events which automatically are replaced with day+1 plots
     # for i in tqdm([3, 25, 27, 30, 32, 34, 41, 43, 48]):  # replot some events which automatically are replaced with day+1 plots
@@ -826,9 +691,11 @@ for i in tqdm(range(0, len(dates))):  # standard
         sixs_resample = averaging  # '10min'
         sixs_ch_e1 = [5, 6]
         sixs_ch_e100 = 2
+        if higher_e100:
+            sixs_ch_e100 = 4
         sixs_ch_p = [8, 9]  # we want 'P8'-'P9' averaged
         if lower_proton:
-            sixs_ch_p = [7]
+            sixs_ch_p = 7
         sixs_side = 2
         sixs_color = 'orange'  # seaborn_colorblind[4]  # orange?
         # sixs_path = '/home/gieseler/uni/bepi/data/bc_mpo_sixs/data_csv/cruise/sixs-p/raw'
@@ -847,6 +714,8 @@ for i in tqdm(range(0, len(dates))):  # standard
                 erne_p_ch = [0]
         if ephin_e:
             ephin_ch_e1 = 'E1300'
+            if higher_e100:
+                ephin_ch_e100 = 'E150'
             # ephin_e_intercal = 1/14.
         # if ephin_p:
         #     ephin_ch_p = 'p25'
@@ -855,7 +724,9 @@ for i in tqdm(range(0, len(dates))):  # standard
         solo_het_color = seaborn_colorblind[0]  # 'blue' # seaborn_colorblind[1]
         sector = 'sun'
         ept_ch_e100 = [14, 18]  # [25]
-        het_ch_e1 = [0, 1]
+        if higher_e100:
+            ept_ch_e100 = [32, 33]  # [25]
+        het_ch_e1 = [0]
         ept_ch_p = [50, 56]  # 50-56
         het_ch_p = [19, 24]  # [18, 19]
         if lower_proton:
@@ -870,8 +741,10 @@ for i in tqdm(range(0, len(dates))):  # standard
         stereo_let_color = 'orangered'  # seaborn_colorblind[3]  # 'coral'
         sector = 'sun'
         sept_ch_e100 = [6, 7]  # [12, 16]
+        if higher_e100:
+            sept_ch_e100 = 16
         sept_ch_p = [25, 30]
-        st_het_ch_e = [0, 1]
+        st_het_ch_e = [0]
         st_het_ch_p = [5, 8]  # 3  #7 #3
         if lower_proton:
             st_het_ch_p = [0]
@@ -884,6 +757,8 @@ for i in tqdm(range(0, len(dates))):  # standard
     if WIND:
         wind_color = 'dimgrey'
         wind3dp_ch_e100 = 3
+        if higher_e100:
+            wind3dp_ch_e100 = 6
         wind3dp_ch_p = 6
         wind_3dp_resample = averaging  # '30min'
         wind_3dp_threshold = None  # 1e3/1e6  # None
@@ -891,6 +766,8 @@ for i in tqdm(range(0, len(dates))):  # standard
         wind_path = '/home/jagies/data/wind/'
     if PSP:
         psp_epilo_ch_e100 = [4, 5]  # cf. psp_epilo_energies
+        if higher_e100:
+            psp_epilo_ch_e100 = [4, 5]  # cf. psp_epilo_energies
         psp_het_ch_e = [3, 10]  # cf. psp_het_energies
         psp_het_ch_p = [8, 9]  # cf. psp_het_energies
         if lower_proton:
@@ -1043,18 +920,25 @@ for i in tqdm(range(0, len(dates))):  # standard
                 df_ept_e = ept_e['Electron_Flux']
                 ept_en_str_e = ept_energies['Electron_Bins_Text'][:]
 
-                # if ept_use_corr_e:
-                #     print('correcting e')
-                #     ion_cont_corr_matrix = np.loadtxt('EPT_ion_contamination_flux_paco.dat')
-                #     Electron_Flux_cont = np.zeros(np.shape(df_ept_e))
-                #     for tt in range(len(df_ept_e)):
-                #         Electron_Flux_cont[tt, :] = np.matmul(ion_cont_corr_matrix, df_ept_p.values[tt, :])
-                #     df_ept_e = df_ept_e - Electron_Flux_cont
+                if ept_use_corr_e:
+                    print('correcting solo/ept e')
+                    # ion_cont_corr_matrix = np.loadtxt('EPT_ion_contamination_flux_paco.dat')
+                    # Electron_Flux_cont = np.zeros(np.shape(df_ept_e))
+                    # for tt in range(len(df_ept_e)):
+                    #     Electron_Flux_cont[tt, :] = np.matmul(ion_cont_corr_matrix, df_ept_p.values[tt, :])
+                    # df_ept_e = df_ept_e - Electron_Flux_cont
+                    if isinstance(solo_ept_resample, str):
+                        ept_e2 = resample_df(ept_e, solo_ept_resample)
+                        ept_p2 = resample_df(ept_p, solo_ept_resample)
+                    df_ept_e = calc_ept_corrected_e(ept_e2, ept_p2)
+                    
+                    df_ept_e = df_ept_e[f'Electron_Flux_{ept_ch_e100[0]}']
+                    ept_chstring_e = ept_energies['Electron_Bins_Text'][ept_ch_e100[0]][0]
 
-                df_ept_e, ept_chstring_e = calc_av_en_flux_EPD(ept_e, ept_energies, ept_ch_e100, 'ept')
-
-                if isinstance(solo_ept_resample, str):
-                    df_ept_e = resample_df(df_ept_e, solo_ept_resample)
+                if not ept_use_corr_e:
+                    df_ept_e, ept_chstring_e = calc_av_en_flux_EPD(ept_e, ept_energies, ept_ch_e100, 'ept')
+                    if isinstance(solo_ept_resample, str):
+                        df_ept_e = resample_df(df_ept_e, solo_ept_resample)
             if plot_p:
                 df_ept_p = ept_p['Ion_Flux']
                 ept_en_str_p = ept_energies['Ion_Bins_Text'][:]
@@ -1124,7 +1008,12 @@ for i in tqdm(range(0, len(dates))):  # standard
             # 1 MeV electrons:
             sixs_df_e1, sixs_e1_en_channel_string = calc_av_en_flux_sixs(sixs_df_e, sixs_ch_e1, 'e')
             # >25 MeV protons:
-            sixs_df_p25, sixs_p25_en_channel_string = calc_av_en_flux_sixs(sixs_df_p, sixs_ch_p, 'p')
+            if not lower_proton:
+                sixs_df_p25, sixs_p25_en_channel_string = calc_av_en_flux_sixs(sixs_df_p, sixs_ch_p, 'p')
+            elif lower_proton:
+                sixs_df_p25 = sixs_df_p[f'P{sixs_ch_p}']
+                sixs_p25_en_channel_string = sixs_meta['Energy_Bin_str'][f'P{sixs_ch_p}']
+
             # 100 keV electrons withouth averaging:
             sixs_df_e100 = sixs_df_e[f'E{sixs_ch_e100}']
             sixs_e100_en_channel_string = sixs_meta['Energy_Bin_str'][f'E{sixs_ch_e100}']
@@ -1252,11 +1141,18 @@ for i in tqdm(range(0, len(dates))):  # standard
 
         if Bepi:
             # ax.plot(sixs_e.index, sixs_e[sixs_ch_e], color='orange', linewidth=linewidth, label='BepiColombo\nSIXS '+sixs_chstrings[sixs_ch_e]+f'\nside {sixs_side_e}', drawstyle='steps-mid')
-            if len(sixs_df) > 0:
-                ax.plot(sixs_df_e100.index, sixs_df_e100, color=sixs_color, linewidth=linewidth, label=f'BepiColombo/SIXS side {sixs_side} '+sixs_e100_en_channel_string, drawstyle='steps-mid')
+            if not skip_bepi_e100:
+                if len(sixs_df) > 0:
+                    ax.plot(sixs_df_e100.index, sixs_df_e100, color=sixs_color, linewidth=linewidth, label=f'BepiColombo/SIXS side {sixs_side} '+sixs_e100_en_channel_string, drawstyle='steps-mid')
             if plot_times:
                 [ax.axvline(i, lw=vlw, color=sixs_color) for i in df_bepi_onset_e100]
                 [ax.axvline(i, lw=vlw, ls=':', color=sixs_color) for i in df_bepi_peak_e100]
+
+        if SOHO:
+            if ephin_e:
+                if len(soho_ephin) > 0:
+                    if higher_e100:
+                        ax.plot(soho_ephin.index, soho_ephin[ephin_ch_e100], color=soho_ephin_color, linewidth=linewidth, label='SOHO/EPHIN '+ephin_energies[ephin_ch_e100], drawstyle='steps-mid')
 
         if SOLO:
             if ept and (len(ept_e) > 0):
@@ -1330,6 +1226,8 @@ for i in tqdm(range(0, len(dates))):  # standard
         ax.set_yscale('log')
         ax.set_ylabel(intensity_label)
         ax.legend(loc='center left', bbox_to_anchor=(1, 0.5), title='100 keV '+species_string)
+        if higher_e100:
+            ax.legend(loc='center left', bbox_to_anchor=(1, 0.5), title='400 keV '+species_string)
 
         if add_contaminating_channels:
             ax2.set_yscale('log')
