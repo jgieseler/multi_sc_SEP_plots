@@ -9,9 +9,7 @@ import pandas as pd
 import sunpy
 from matplotlib.ticker import AutoMinorLocator
 from matplotlib.transforms import blended_transform_factory
-from seppy.loader.psp import (calc_av_en_flux_PSP_EPIHI,
-                              calc_av_en_flux_PSP_EPILO, psp_isois_load,
-                              resample_df)
+from seppy.loader.psp import calc_av_en_flux_PSP_EPIHI, calc_av_en_flux_PSP_EPILO, psp_isois_load, resample_df
 from seppy.loader.soho import calc_av_en_flux_ERNE, soho_load
 from seppy.loader.stereo import calc_av_en_flux_HET as calc_av_en_flux_ST_HET
 from seppy.loader.stereo import calc_av_en_flux_SEPT, stereo_load
@@ -36,7 +34,7 @@ add_contaminating_channels = False
 skip_bepi_e100 = False
 
 # use 400 keV instead of 100 keV electrons
-higher_e100 = True
+higher_e100 = False
 
 if add_contaminating_channels:
     add_sept_conta_ch = True  # True if contaminaiting STEREO-A/SEPT ion channel (ch 15) should be added to the 100 keV electron panel
@@ -62,6 +60,7 @@ if mode == 'events':
     averaging = '20min'  # '5min' None
 
 Bepi = True
+Maven = True
 PSP = False
 SOHO = True
 SOLO = True
@@ -70,22 +69,23 @@ WIND = True
 
 
 # SOHO:
-erne = True
-ephin_p = False  # not included yet!
+erne = False
+ephin_p = False  # not included yet! All proton data is set to -9e9 during loading bc. it's not fully implemented yet
 ephin_e = True  # not included yet!
 
 # SOLO:
 ept = True
-het = True
+het = False
+plot_ept_p = True
 ept_use_corr_e = False
 
 # STEREO:
 sept_e = True
-sept_p = False
-stereo_het = True
+sept_p = True
+stereo_het = False
 let = False
 
-wind3dp_p = False
+wind3dp_p = True
 wind3dp_e = True
 
 # plot vertical lines with previously found onset and peak times
@@ -133,7 +133,7 @@ linewidth = 3
 vlw = 2.5  # linewidth for vertical lines (default 2)
 outpath = None  # os.getcwd()
 plot_e_100 = True
-plot_e_1 = True
+plot_e_1 = False
 plot_p = True
 save_fig = True
 outpath = 'plots'  # '/Users/dresing/Documents/Proposals/SERPENTINE_H2020/Cycle25_Multi-SC_SEP_Event_List/Multi_sc_plots'
@@ -650,7 +650,7 @@ if plot_peak_vs_time2:
             ax.bar(dates[np.argmax(fluxes)], fluxes[np.argmax(fluxes)], width=3, color='k', label=f'{event}')
     ax.set_title('>25 MeV protons')
     if lower_proton:
-        ax.set_title('14 MeV protons')
+        ax.set_title('MeV protons')
     ax.set_xlim(dt.datetime(2020, 11, 1), dt.datetime(2022, 6, 1))
     ax.set_yscale('log')
     ax.set_ylabel('Peak Flux / (s cm² sr MeV)')
@@ -690,16 +690,35 @@ for i in tqdm(range(0, 1)):  # standard
         # av_bepi = 10
         sixs_resample = averaging  # '10min'
         sixs_ch_e1 = [5, 6]
-        sixs_ch_e100 = 2
+        sixs_ch_e100 = 1  # 2
         if higher_e100:
             sixs_ch_e100 = 4
         sixs_ch_p = [8, 9]  # we want 'P8'-'P9' averaged
         if lower_proton:
-            sixs_ch_p = 7
+            sixs_ch_p = 5  # 7
         sixs_side = 2
         sixs_color = 'orange'  # seaborn_colorblind[4]  # orange?
         # sixs_path = '/home/gieseler/uni/bepi/data/bc_mpo_sixs/data_csv/cruise/sixs-p/raw'
         sixs_path = '/home/jagies/data/bepi/bc_mpo_sixs/data_csv/cruise/sixs-p/raw'
+
+    if Maven:
+        maven_resample = None  # averaging  # '10min'
+        # maven_ch_e1 = 0
+        maven_ch_e100 = 9  # 11
+        # if higher_e100:
+        #     maven_ch_e100 = 4
+        # maven_ch_p = 0
+        if lower_proton:
+            maven_ch_p = 27  # 26
+        maven_color = 'magenta'  # seaborn_colorblind[4]  # orange?
+        maven_path = '/home/jagies/uni/serpentine/multi_sc_SEP_plots/plots/march_13/'
+        maven_efname = 'Mar2023NDresing_mvn_5min_SEP1F_elec_EFLUX_open.txt'
+        maven_ifname = 'Mar2023NDresing_mvn_5min_SEP1F_ion_EFLUX_open.txt'
+        maven_time_format = '%Y-%m-%d/%H:%M:%S.%f'
+        maven_e_channels = [21.0497, 22.4964, 23.9430, 26.1130, 29.0062, 32.6228, 37.6860, 44.1959, 52.8757, 64.4487, 79.6384, 99.8912, 126.654, 161.373, 206.942]
+        maven_p_channels = [20.8326, 22.2503, 23.6680, 25.7945, 28.6298, 32.1740, 37.1359, 43.5155, 52.0215, 63.3630, 78.2486, 98.0961, 124.323, 158.347, 203.004,
+                            261.838, 339.810, 442.592, 577.272, 755.190, 989.816, 1298.87, 1706.45, 2243.04, 2949.05, 3879.05, 5111.72, 6687.22]
+
     if SOHO:
         soho_ephin_color = 'k'
         soho_erne_color = 'k'  # seaborn_colorblind[5]  # 'green'
@@ -717,20 +736,20 @@ for i in tqdm(range(0, 1)):  # standard
             if higher_e100:
                 ephin_ch_e100 = 'E150'
             # ephin_e_intercal = 1/14.
-        # if ephin_p:
-        #     ephin_ch_p = 'p25'
+        if ephin_p:
+            ephin_ch_p = 'P4'
     if SOLO:
         solo_ept_color = seaborn_colorblind[5]  # 'blue'
         solo_het_color = seaborn_colorblind[0]  # 'blue' # seaborn_colorblind[1]
         sector = 'sun'
-        ept_ch_e100 = [14, 18]  # [25]
+        ept_ch_e100 = [9, 12]  # [14, 18]  # [25]
         if higher_e100:
             ept_ch_e100 = [32, 33]  # [25]
         het_ch_e1 = [0]
-        ept_ch_p = [50, 56]  # 50-56
+        ept_ch_p = 63  # [50, 56]  # 50-56
         het_ch_p = [19, 24]  # [18, 19]
         if lower_proton:
-            het_ch_p = [11, 12]
+            het_ch_p = 0 # [11, 12]
         solo_ept_resample = averaging
         solo_het_resample = averaging
         # solo_path = '/home/gieseler/uni/solo/data/'
@@ -740,10 +759,10 @@ for i in tqdm(range(0, 1)):  # standard
         stereo_het_color = 'orangered'  # seaborn_colorblind[3]  # 'coral'
         stereo_let_color = 'orangered'  # seaborn_colorblind[3]  # 'coral'
         sector = 'sun'
-        sept_ch_e100 = [6, 7]  # [12, 16]
+        sept_ch_e100 = [3, 5]  # [6, 7]  # [12, 16]
         if higher_e100:
             sept_ch_e100 = 16
-        sept_ch_p = [25, 30]
+        sept_ch_p = 31 # [25, 30]
         st_het_ch_e = [0]
         st_het_ch_p = [5, 8]  # 3  #7 #3
         if lower_proton:
@@ -756,10 +775,10 @@ for i in tqdm(range(0, 1)):  # standard
         stereo_path = '/home/jagies/data/stereo/'
     if WIND:
         wind_color = 'dimgrey'
-        wind3dp_ch_e100 = 3
+        wind3dp_ch_e100 = 2  # 3
         if higher_e100:
             wind3dp_ch_e100 = 6
-        wind3dp_ch_p = 6
+        wind3dp_ch_p = 8  # 6
         wind_3dp_resample = averaging  # '30min'
         wind_3dp_threshold = None  # 1e3/1e6  # None
         # wind_path = '/home/gieseler/uni/wind/data/'
@@ -910,6 +929,19 @@ for i in tqdm(range(0, 1)):  # standard
             sixs_df_p = sixs_df[[f"P{i}" for i in range(1, 10)]]
             sixs_df_e = sixs_df[[f"E{i}" for i in range(1, 8)]]
 
+    if Maven:
+        print('loading Maven')
+        maven_e = pd.read_csv(maven_path+maven_efname, sep="\s+",
+                              names=['Time', 'E0', 'E1', 'E2', 'E3', 'E4', 'E5', 'E6', 'E7', 'E8', 'E9', 'E10', 'E11', 'E12', 'E13', 'E14'])
+        maven_e.index = pd.to_datetime(maven_e['Time'], errors='coerce')
+        maven_e.drop('Time', axis=1, inplace=True)
+
+        maven_p = pd.read_csv(maven_path+maven_ifname, sep="\s+",
+                              names=['Time', 'E0', 'E1', 'E2', 'E3', 'E4', 'E5', 'E6', 'E7', 'E8', 'E9', 'E10', 'E11', 'E12', 'E13', 'E14', 'E15',
+                                     'E16', 'E17', 'E18', 'E19', 'E20', 'E21', 'E22', 'E23', 'E24', 'E25', 'E26', 'E27'])
+        maven_p.index = pd.to_datetime(maven_p['Time'], errors='coerce')
+        maven_p.drop('Time', axis=1, inplace=True)
+
     """
     ########## AVERAGE ENERGY CHANNELS ##########
     #############################################
@@ -931,7 +963,7 @@ for i in tqdm(range(0, 1)):  # standard
                         ept_e2 = resample_df(ept_e, solo_ept_resample)
                         ept_p2 = resample_df(ept_p, solo_ept_resample)
                     df_ept_e = calc_ept_corrected_e(ept_e2, ept_p2)
-                    
+
                     df_ept_e = df_ept_e[f'Electron_Flux_{ept_ch_e100[0]}']
                     ept_chstring_e = ept_energies['Electron_Bins_Text'][ept_ch_e100[0]][0]
 
@@ -953,7 +985,7 @@ for i in tqdm(range(0, 1)):  # standard
                 if isinstance(solo_ept_resample, str):
                     df_ept_conta_p = resample_df(df_ept_conta_p, solo_ept_resample)
 
-        if len(het_e) > 0:
+        if het and len(het_e) > 0:
             if plot_e_1:
                 print('calc_av_en_flux_HET e')
                 df_het_e, het_chstring_e = calc_av_en_flux_EPD(het_e, het_energies, het_ch_e1, 'het')
@@ -1029,6 +1061,13 @@ for i in tqdm(range(0, 1)):  # standard
                 sixs_df_p25 = resample_df(sixs_df_p25, sixs_resample)
                 if add_bepi_conta_ch:
                     sixs_df_p_conta = resample_df(sixs_df_p_conta, sixs_resample)
+
+    if Maven:
+        if isinstance(maven_resample, str):
+            # maven_e = maven_e.resample(maven_resample,label='left').mean()
+            # maven_e.index = maven_e.index + pd.tseries.frequencies.to_offset(pd.Timedelta(maven_resample)/2)
+            maven_e = resample_df(maven_e, maven_resample)
+            maven_p = resample_df(maven_p, maven_resample)
 
     if PSP:
         if len(psp_het) > 0:
@@ -1148,6 +1187,9 @@ for i in tqdm(range(0, 1)):  # standard
                 [ax.axvline(i, lw=vlw, color=sixs_color) for i in df_bepi_onset_e100]
                 [ax.axvline(i, lw=vlw, ls=':', color=sixs_color) for i in df_bepi_peak_e100]
 
+        if Maven:
+            ax.plot(pd.to_datetime(maven_e.index, format=maven_time_format), maven_e[f'E{maven_ch_e100}'], color=maven_color, linewidth=linewidth, label=f'Maven {maven_e_channels[maven_ch_e100]} keV', drawstyle='steps-mid')
+
         if SOHO:
             if ephin_e:
                 if len(soho_ephin) > 0:
@@ -1225,7 +1267,7 @@ for i in tqdm(range(0, 1)):  # standard
         # ax.set_ylim(0.3842003987966555, 6333.090511873226)
         ax.set_yscale('log')
         ax.set_ylabel(intensity_label)
-        ax.legend(loc='center left', bbox_to_anchor=(1, 0.5), title='100 keV '+species_string)
+        ax.legend(loc='center left', bbox_to_anchor=(1, 0.5), title='keV '+species_string)
         if higher_e100:
             ax.legend(loc='center left', bbox_to_anchor=(1, 0.5), title='400 keV '+species_string)
 
@@ -1349,18 +1391,22 @@ for i in tqdm(range(0, 1)):  # standard
             if plot_times:
                 [ax.axvline(i, lw=vlw, color=sixs_color) for i in df_bepi_onset_p]
                 [ax.axvline(i, lw=vlw, ls=':', color=sixs_color) for i in df_bepi_peak_p]
+        if Maven:
+            ax.plot(pd.to_datetime(maven_p.index, format=maven_time_format), maven_p[f'E{maven_ch_p}'], color=maven_color, linewidth=linewidth, label=f'Maven {maven_p_channels[maven_ch_p]} keV', drawstyle='steps-mid')
         if SOLO:
-            if het and (len(ept_e) > 0):
+            if het and (len(df_het_p) > 0):
                 ax.plot(df_het_p.index, df_het_p, linewidth=linewidth, color=solo_het_color, label=f'SOLO/HET {sector} '+het_chstring_p, drawstyle='steps-mid')
             if plot_times:
                 [ax.axvline(i, lw=vlw, color=solo_het_color) for i in df_solo_onset_p]
                 [ax.axvline(i, lw=vlw, ls=':', color=solo_het_color) for i in df_solo_peak_p]
+            if plot_ept_p and (len(ept_p) > 0):
+                ax.plot(df_ept_p.index, df_ept_p, linewidth=linewidth, color=solo_ept_color, label=f'SOLO/EPT {sector} '+ept_chstring_p, drawstyle='steps-mid')
         if STEREO:
             if sept_p:
                 if type(sept_ch_p) is list and len(sta_sept_avg_p) > 0:
                     ax.plot(sta_sept_df_p.index, sta_sept_avg_p, color=stereo_sept_color, linewidth=linewidth, label=f'STEREO-A/SEPT {sector} '+sept_chstring_p, drawstyle='steps-mid')
                 elif type(sept_ch_p) is int:
-                    ax.plot(sta_sept_df_p.index, sta_sept_df_p[f'ch_{sept_ch_p}'], color=stereo_sept_color, linewidth=linewidth, label='STEREO-A/SEPT '+sta_sept_dict_p.loc[sept_ch_p]['ch_strings']+f' {sector}', drawstyle='steps-mid')
+                    ax.plot(sta_sept_df_p.index, sta_sept_df_p[f'ch_{sept_ch_p}'], color=stereo_sept_color, linewidth=linewidth, label=f'STEREO-A/SEPT {sector} '+sta_sept_dict_p.loc[sept_ch_p]['ch_strings'], drawstyle='steps-mid')
             if stereo_het:
                 if len(sta_het_avg_p) > 0:
                     ax.plot(sta_het_avg_p.index, sta_het_avg_p, color=stereo_het_color,
@@ -1378,21 +1424,23 @@ for i in tqdm(range(0, 1)):  # standard
                 elif type(erne_p_ch) is int:
                     if len(soho_erne) > 0:
                         ax.plot(soho_erne.index, soho_erne[f'PH_{erne_p_ch}'], color=soho_erne_color, linewidth=linewidth, label='SOHO/ERNE/HED '+erne_chstring[erne_p_ch], drawstyle='steps-mid')
-            # if ephin_p:
-            #     ax.plot(ephin['date'], ephin[ephin_ch_p][0], color=soho_ephin_color, linewidth=linewidth, label='SOHO/EPHIN '+ephin[ephin_ch_p][1], drawstyle='steps-mid')
+            if ephin_p and len(soho_ephin) > 0:
+                ax.plot(soho_ephin.index, soho_ephin[ephin_ch_p], color=soho_ephin_color, linewidth=linewidth, label='SOHO/EPHIN '+ephin_energies[ephin_ch_p], drawstyle='steps-mid')
             if plot_times:
                 [ax.axvline(i, lw=vlw, color=soho_erne_color) for i in df_soho_onset_p]
                 [ax.axvline(i, lw=vlw, ls=':', color=soho_erne_color) for i in df_soho_peak_p]
-        # if WIND:
-            # multiply by 1e6 to get per MeV
-        #    ax.plot(wind3dp_p_df.index, wind3dp_p_df[f'FLUX_{wind3dp_ch_p}']*1e6, color=wind_color, linewidth=linewidth, label='Wind\n3DP '+str(round(wind3dp_p_df[f'ENERGY_{wind3dp_ch_p}'].mean()/1000., 2)) + ' keV', drawstyle='steps-mid')
+        if WIND:
+            if wind3dp_p:
+                # multiply by 1e6 to get per MeV
+                # ax.plot(wind3dp_p_df.index, wind3dp_p_df[f'FLUX_{wind3dp_ch_p}']*1e6, color=wind_color, linewidth=linewidth, label='Wind/3DP omni '+str(round(wind3dp_p_df[f'ENERGY_{wind3dp_ch_p}'].mean()/1000., 2)) + ' keV', drawstyle='steps-mid')
+                ax.plot(wind3dp_p_df.index, wind3dp_p_df[f'FLUX_{wind3dp_ch_p}']*1e6, color=wind_color, linewidth=linewidth, label='Wind/3DP omni '+wind3dp_p_meta['channels_dict_df']['Bins_Text'].iloc[wind3dp_ch_p], drawstyle='steps-mid')
         # ax.set_ylim(2.05e-5, 4.8e0)
         # ax.set_ylim(0.00033920545179055416, 249.08996960298424)
         ax.set_yscale('log')
         ax.set_ylabel(intensity_label)
         ax.legend(loc='center left', bbox_to_anchor=(1, 0.5), title='>25 MeV Protons/Ions')
         if lower_proton:
-            ax.legend(loc='center left', bbox_to_anchor=(1, 0.5), title='14 MeV Protons/Ions')
+            ax.legend(loc='center left', bbox_to_anchor=(1, 0.5), title='MeV Protons/Ions')
 
         if plot_shock_times:
             for i in df_shocks.index:
