@@ -800,6 +800,7 @@ if mode == 'regular':
 if mode == 'events':
     dates = all_onset_dates_first
 # for startdate in tqdm(dates.to_pydatetime()):  # not in use any more
+# for i in tqdm(range(0, len(dates))):  # standard
 for i in tqdm(range(0, len(dates))):  # standard
     # for i in tqdm(range(7, len(dates))):
     # for i in tqdm([3, 25, 27, 30, 32, 34, 41, 43, 48]):  # replot some events which automatically are replaced with day+1 plots
@@ -832,7 +833,7 @@ for i in tqdm(range(0, len(dates))):  # standard
         sixs_side = 2
         sixs_color = 'orange'  # seaborn_colorblind[4]  # orange?
         # sixs_path = '/home/gieseler/uni/bepi/data/bc_mpo_sixs/data_csv/cruise/sixs-p/raw'
-        sixs_path = '/home/jagies/data/bepi/bc_mpo_sixs/data_csv/cruise/sixs-p/raw'
+        sixs_path = '/Users/jagies/data/bepi/bc_mpo_sixs/data_csv/cruise/sixs-p/raw'
     if SOHO:
         soho_ephin_color = 'k'
         soho_erne_color = 'k'  # seaborn_colorblind[5]  # 'green'
@@ -840,7 +841,7 @@ for i in tqdm(range(0, len(dates))):  # standard
         soho_erne_resample = averaging  # '30min'
         soho_ephin_resample = averaging  # '30min'
         # soho_path = '/home/gieseler/uni/soho/data/'
-        soho_path = '/home/jagies/data/soho/'
+        soho_path = '/Users/jagies/data/soho/'
         if erne:
             erne_p_ch = [3, 4]  # [0]  # [4,5]  # 2
             if lower_proton:
@@ -863,7 +864,7 @@ for i in tqdm(range(0, len(dates))):  # standard
         solo_ept_resample = averaging
         solo_het_resample = averaging
         # solo_path = '/home/gieseler/uni/solo/data/'
-        solo_path = '/home/jagies/data/solo/'
+        solo_path = '/Users/jagies/data/solo/'
     if STEREO:
         stereo_sept_color = 'orangered'  # seaborn_colorblind[3]  #
         stereo_het_color = 'orangered'  # seaborn_colorblind[3]  # 'coral'
@@ -880,7 +881,7 @@ for i in tqdm(range(0, len(dates))):  # standard
         sta_sept_resample = averaging
         sta_let_resample = averaging
         # stereo_path = '/home/gieseler/uni/stereo/data/'
-        stereo_path = '/home/jagies/data/stereo/'
+        stereo_path = '/Users/jagies/data/stereo/'
     if WIND:
         wind_color = 'dimgrey'
         wind3dp_ch_e100 = 3
@@ -888,7 +889,7 @@ for i in tqdm(range(0, len(dates))):  # standard
         wind_3dp_resample = averaging  # '30min'
         wind_3dp_threshold = None  # 1e3/1e6  # None
         # wind_path = '/home/gieseler/uni/wind/data/'
-        wind_path = '/home/jagies/data/wind/'
+        wind_path = '/Users/jagies/data/wind/'
     if PSP:
         psp_epilo_ch_e100 = [4, 5]  # cf. psp_epilo_energies
         psp_het_ch_e = [3, 10]  # cf. psp_het_energies
@@ -900,7 +901,7 @@ for i in tqdm(range(0, len(dates))):  # standard
         psp_epilo_viewing = 3  # 3="sun", 7="antisun"
         psp_epilo_threshold = None  # 1e2  # None
         # psp_path = '/home/gieseler/uni/psp/data/'
-        psp_path = '/home/jagies/data/psp/'
+        psp_path = '/Users/jagies/data/psp/'
         psp_het_resample = averaging
         psp_epilo_resample = averaging
         psp_het_color = 'blueviolet'
