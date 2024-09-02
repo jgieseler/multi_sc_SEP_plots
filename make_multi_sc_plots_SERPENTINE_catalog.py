@@ -27,7 +27,7 @@ from tqdm import tqdm
 #############################################################
 
 # processing mode: 'regular' (e.g. weekly) or 'events'
-mode = 'events'
+mode = 'regular'
 
 lower_proton = False  # True if 13 MeV protons should be used instead of 25+ MeV
 add_contaminating_channels = False
@@ -47,8 +47,8 @@ else:
     add_bepi_conta_ch = False  # True if contaminaiting Bepi/SIXS ion channel (XXX) should be added to the 100 keV electron panel
 
 if mode == 'regular':
-    first_date = dt.datetime(2022, 8, 27)
-    last_date = dt.datetime(2022, 8, 30)
+    first_date = dt.datetime(2022, 1, 4)
+    last_date = dt.datetime(2023, 12, 31)
     plot_period = '7D'
     averaging = '1h'  # '5min'  # None
 
@@ -83,7 +83,10 @@ wind3dp_p = False
 wind3dp_e = True
 
 # plot vertical lines with previously found onset and peak times
-plot_times = True
+if mode == 'regular':
+    plot_times = False
+if mode == 'events':
+    plot_times = True
 
 # plot vertical lines with previously found shock times provided by https://parker.gsfc.nasa.gov/shocks.html
 plot_shock_times = False
@@ -385,7 +388,8 @@ Create event time list for SEPserver
 # Needs plot_times=True to create list 'all_onset_dates_first' above!
 if plot_times:
     # negative_offset = pd.Timedelta('5h')  # set to '0h' to disable
-    plot_period = ('72h')
+    if mode == 'events':
+        plot_period = ('72h')
 
     df_sepserver = pd.DataFrame({'start': all_onset_dates_first})
     # df_sepserver['start'] = df_sepserver['start'] - negative_offset
@@ -1453,7 +1457,7 @@ for i in tqdm(range(0, len(dates))):  # standard
                 [ax.axvline(i, lw=vlw, color=sixs_color) for i in df_bepi_onset_p]
                 [ax.axvline(i, lw=vlw, ls=':', color=sixs_color) for i in df_bepi_peak_p]
         if SOLO:
-            if het and (len(ept_e) > 0):
+            if het and (len(het_p) > 0):
                 ax.plot(df_het_p.index, df_het_p, linewidth=linewidth, color=solo_het_color, label=f'SOLO/HET {sector} '+het_chstring_p, drawstyle='steps-mid')
             if plot_times:
                 [ax.axvline(i, lw=vlw, color=solo_het_color) for i in df_solo_onset_p]
