@@ -8,7 +8,7 @@ import numpy as np
 import pandas as pd
 import sunpy
 from matplotlib.ticker import AutoMinorLocator
-from matplotlib.transforms import blended_transform_factory
+# from matplotlib.transforms import blended_transform_factory
 from seppy.loader.psp import calc_av_en_flux_PSP_EPIHI, calc_av_en_flux_PSP_EPILO, psp_isois_load, resample_df
 from seppy.loader.soho import calc_av_en_flux_ERNE, soho_load
 from seppy.loader.stereo import calc_av_en_flux_HET as calc_av_en_flux_ST_HET
@@ -699,7 +699,7 @@ for i in tqdm(range(0, 1)):  # standard
         sixs_side = 2
         sixs_color = 'orange'  # seaborn_colorblind[4]  # orange?
         # sixs_path = '/home/gieseler/uni/bepi/data/bc_mpo_sixs/data_csv/cruise/sixs-p/raw'
-        sixs_path = '/home/jagies/data/bepi/bc_mpo_sixs/data_csv/cruise/sixs-p/raw'
+        sixs_path = '/Users/jagies/data/bepi/bc_mpo_sixs/data_csv/cruise/sixs-p/raw'
 
     if Maven:
         maven_resample = None  # averaging  # '10min'
@@ -710,14 +710,20 @@ for i in tqdm(range(0, 1)):  # standard
         # maven_ch_p = 0
         if lower_proton:
             maven_ch_p = 27  # 26
+        maven_ch_p_new_1 = 0
+        maven_ch_p_new_2 = 0
         maven_color = 'magenta'  # seaborn_colorblind[4]  # orange?
-        maven_path = '/home/jagies/uni/serpentine/multi_sc_SEP_plots/plots/march_13/'
+        maven_path = 'plots/march_13/'
         maven_efname = 'Mar2023NDresing_mvn_5min_SEP1F_elec_EFLUX_open.txt'
         maven_ifname = 'Mar2023NDresing_mvn_5min_SEP1F_ion_EFLUX_open.txt'
+        maven_ifname_new_1 = 'Mar2023NDresing_mdap_dint_md1_sta.txt'
+        maven_ifname_new_2 = 'Mar2023NDresing_mdap_dint_md1sub_sta.txt'
         maven_time_format = '%Y-%m-%d/%H:%M:%S.%f'
         maven_e_channels = [21.0497, 22.4964, 23.9430, 26.1130, 29.0062, 32.6228, 37.6860, 44.1959, 52.8757, 64.4487, 79.6384, 99.8912, 126.654, 161.373, 206.942]
         maven_p_channels = [20.8326, 22.2503, 23.6680, 25.7945, 28.6298, 32.1740, 37.1359, 43.5155, 52.0215, 63.3630, 78.2486, 98.0961, 124.323, 158.347, 203.004,
                             261.838, 339.810, 442.592, 577.272, 755.190, 989.816, 1298.87, 1706.45, 2243.04, 2949.05, 3879.05, 5111.72, 6687.22]
+        maven_p_channels_new_1 = ['23 - 27.4 MeV']
+        maven_p_channels_new_2 = ['13.0 - 17.3 MeV', '18.3 - 24.4 MeV', '25.9 - 34.5 MeV', '36.5 - 48.7 MeV', '51.6 - 68.8 MeV', '72.9 - 102.9 MeV']
 
     if SOHO:
         soho_ephin_color = 'k'
@@ -726,7 +732,7 @@ for i in tqdm(range(0, 1)):  # standard
         soho_erne_resample = averaging  # '30min'
         soho_ephin_resample = averaging  # '30min'
         # soho_path = '/home/gieseler/uni/soho/data/'
-        soho_path = '/home/jagies/data/soho/'
+        soho_path = '/Users/jagies/data/soho/'
         if erne:
             erne_p_ch = [3, 4]  # [0]  # [4,5]  # 2
             if lower_proton:
@@ -753,7 +759,7 @@ for i in tqdm(range(0, 1)):  # standard
         solo_ept_resample = averaging
         solo_het_resample = averaging
         # solo_path = '/home/gieseler/uni/solo/data/'
-        solo_path = '/home/jagies/data/solo/'
+        solo_path = '/Users/jagies/data/solo/'
     if STEREO:
         stereo_sept_color = 'orangered'  # seaborn_colorblind[3]  #
         stereo_het_color = 'orangered'  # seaborn_colorblind[3]  # 'coral'
@@ -772,7 +778,7 @@ for i in tqdm(range(0, 1)):  # standard
         sta_sept_resample = averaging
         sta_let_resample = averaging
         # stereo_path = '/home/gieseler/uni/stereo/data/'
-        stereo_path = '/home/jagies/data/stereo/'
+        stereo_path = '/Users/jagies/data/stereo/'
     if WIND:
         wind_color = 'dimgrey'
         wind3dp_ch_e100 = 2  # 3
@@ -782,7 +788,7 @@ for i in tqdm(range(0, 1)):  # standard
         wind_3dp_resample = averaging  # '30min'
         wind_3dp_threshold = None  # 1e3/1e6  # None
         # wind_path = '/home/gieseler/uni/wind/data/'
-        wind_path = '/home/jagies/data/wind/'
+        wind_path = '/Users/jagies/data/wind/'
     if PSP:
         psp_epilo_ch_e100 = [4, 5]  # cf. psp_epilo_energies
         if higher_e100:
@@ -796,7 +802,7 @@ for i in tqdm(range(0, 1)):  # standard
         psp_epilo_viewing = 3  # 3="sun", 7="antisun"
         psp_epilo_threshold = None  # 1e2  # None
         # psp_path = '/home/gieseler/uni/psp/data/'
-        psp_path = '/home/jagies/data/psp/'
+        psp_path = '/Users/jagies/data/psp/'
         psp_het_resample = averaging
         psp_epilo_resample = averaging
         psp_het_color = 'blueviolet'
@@ -941,6 +947,15 @@ for i in tqdm(range(0, 1)):  # standard
                                      'E16', 'E17', 'E18', 'E19', 'E20', 'E21', 'E22', 'E23', 'E24', 'E25', 'E26', 'E27'])
         maven_p.index = pd.to_datetime(maven_p['Time'], errors='coerce')
         maven_p.drop('Time', axis=1, inplace=True)
+
+        maven_p_new_1 = pd.read_csv(maven_path+maven_ifname_new_1, sep="\s+", names=['Time', 'E0'])
+        maven_p_new_1.index = pd.to_datetime(maven_p_new_1['Time'], errors='coerce')
+        maven_p_new_1.drop('Time', axis=1, inplace=True)
+
+        maven_p_new_2 = pd.read_csv(maven_path+maven_ifname_new_2, sep="\s+", names=['Time', 'E0', 'E1', 'E2', 'E3', 'E4', 'E5'])
+        maven_p_new_2.index = pd.to_datetime(maven_p_new_2['Time'], errors='coerce')
+        maven_p_new_2.drop('Time', axis=1, inplace=True)
+
 
     """
     ########## AVERAGE ENERGY CHANNELS ##########
@@ -1393,6 +1408,8 @@ for i in tqdm(range(0, 1)):  # standard
                 [ax.axvline(i, lw=vlw, ls=':', color=sixs_color) for i in df_bepi_peak_p]
         if Maven:
             ax.plot(pd.to_datetime(maven_p.index, format=maven_time_format), maven_p[f'E{maven_ch_p}'], color=maven_color, linewidth=linewidth, label=f'Maven {maven_p_channels[maven_ch_p]} keV', drawstyle='steps-mid')
+            ax.plot(pd.to_datetime(maven_p_new_1.index, format=maven_time_format), maven_p_new_1[f'E{maven_ch_p_new_1}'], color=maven_color, linewidth=linewidth, label=f'Maven {maven_p_channels_new_1[maven_ch_p_new_1]}', drawstyle='steps-mid')
+            ax.plot(pd.to_datetime(maven_p_new_2.index, format=maven_time_format), maven_p_new_2[f'E{maven_ch_p_new_2}'], color=maven_color, linewidth=linewidth, label=f'Maven {maven_p_channels_new_2[maven_ch_p_new_2]}', drawstyle='steps-mid')
         if SOLO:
             if het and (len(df_het_p) > 0):
                 ax.plot(df_het_p.index, df_het_p, linewidth=linewidth, color=solo_het_color, label=f'SOLO/HET {sector} '+het_chstring_p, drawstyle='steps-mid')

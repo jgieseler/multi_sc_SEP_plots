@@ -27,10 +27,13 @@ from tqdm import tqdm
 #############################################################
 
 # processing mode: 'regular' (e.g. weekly) or 'events'
-mode = 'regular'
+mode = 'events'
 
 lower_proton = False  # True if 13 MeV protons should be used instead of 25+ MeV
 add_contaminating_channels = False
+
+# plot vertical lines with previously found shock times provided by https://parker.gsfc.nasa.gov/shocks.html
+plot_shock_times = False
 
 if add_contaminating_channels:
     add_sept_conta_ch = True  # True if contaminaiting STEREO-A/SEPT ion channel (ch 15) should be added to the 100 keV electron panel
@@ -88,8 +91,6 @@ if mode == 'regular':
 if mode == 'events':
     plot_times = True
 
-# plot vertical lines with previously found shock times provided by https://parker.gsfc.nasa.gov/shocks.html
-plot_shock_times = False
 #############################################################
 
 # omit some warnings

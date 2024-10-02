@@ -2,37 +2,24 @@ import datetime as dt
 import os
 import warnings
 
-# import cdflib
 import matplotlib.dates as mdates
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import sunpy
-# from seppy.tools import inf_inj_time
 from matplotlib.ticker import AutoMinorLocator
 # from matplotlib.transforms import blended_transform_factory
 from seppy.loader.psp import calc_av_en_flux_PSP_EPIHI, calc_av_en_flux_PSP_EPILO, psp_isois_load, resample_df
 from seppy.loader.soho import calc_av_en_flux_ERNE, soho_load
-from solo_epd_loader import epd_load
 from seppy.loader.stereo import calc_av_en_flux_HET as calc_av_en_flux_ST_HET
 from seppy.loader.stereo import calc_av_en_flux_SEPT, stereo_load
-# import astropy.units as u
-# from cdflib.epochs import CDFepoch
-# from sunpy import log
-# from sunpy.net import Fido
-# from sunpy.net import attrs as a
-# from sunpy.timeseries import TimeSeries
-# from sunpy.util.exceptions import warn_user
-# from tqdm import tqdm
 from seppy.loader.wind import wind3dp_load
+from seppy.util import bepi_sixs_load, calc_av_en_flux_sixs
+from solo_epd_loader import combine_channels as calc_av_en_flux_EPD
+from solo_epd_loader import epd_load, calc_ept_corrected_e
+from sunpy.coordinates import frames, get_horizons_coord
+from tqdm import tqdm
 
-'''
-June 2022
-this loops over the mission time and creates
-multi-sc plots to be used for the SERPENTINE
-multi-sc SEP event catalog
-moved this file to Deepnote June 15 2022
-'''
 
 # make selections
 #############################################################
@@ -44,35 +31,40 @@ startdate = dt.datetime(2023, 3, 13, 0, 0)
 enddate = dt.datetime(2023, 3, 15, 23, 59)
 plot_period = '60h'
 averaging = '20min'  # '5min'  # None
+averaging2 = '30min'  # '5min'  # None
 
 lower_proton = False  # True if 13 MeV protons should be used instead of 25+ MeV
 
 
 Bepi = True
+Maven = True
 PSP = True
 SOHO = True
 SOLO = True
 STEREO = True
-WIND = False
+WIND = True
 
 
 # SOHO:
 erne = True
-ephin_p = False  # not included yet!
+erne_maven = False
+ephin_p = False  # not included yet! All proton data is set to -9e9 during loading bc. it's not fully implemented yet
 ephin_e = True  # not included yet!
 
 # SOLO:
-ept = False
+ept = True
 het = True
+het_maven = False
 # ept_use_corr_e = False  # not included yet!
 
 # STEREO:
 sept_e = True
-sept_p = False
+sept_p = True
 stereo_het = True
+sta_het_maven = False
 let = False
 
-wind3dp_p = False
+wind3dp_p = True
 wind3dp_e = True
 #############################################################
 
@@ -102,190 +94,14 @@ plt.rcParams['ytick.minor.width'] = 1
 plt.rcParams['axes.linewidth'] = 3.0
 
 
-def calc_av_en_flux_EPD(df, energies, en_channel, species, instrument):  # original from Nina Slack Feb 9, 2022, rewritten Jan Apr 8, 2022
-    """This function averages the flux of several energy channels of HET into a combined energy channel
-    channel numbers counted from 0
-
-    Parameters
-    ----------
-    df : pd.DataFrame DataFrame containing HET data
-        DataFrame containing HET data
-    energies : dict
-        Energy dict returned from epd_loader (from Jan)
-    en_channel : int or list
-        energy channel number(s) to be used
-    species : string
-        'e', 'electrons', 'p', 'i', 'protons', 'ions'
-    instrument : string
-        'ept' or 'het'
-
-    Returns
-    -------
-    pd.DataFrame
-        flux_out: contains channel-averaged flux
-
-    Raises
-    ------
-    Exception
-        [description]
-    """
-    if species.lower() in ['e', 'electrons']:
-        en_str = energies['Electron_Bins_Text']
-        bins_width = 'Electron_Bins_Width'
-        flux_key = 'Electron_Flux'
-    if species.lower() in ['p', 'protons', 'i', 'ions', 'h']:
-        if instrument.lower() == 'het':
-            en_str = energies['H_Bins_Text']
-            bins_width = 'H_Bins_Width'
-            flux_key = 'H_Flux'
-        if instrument.lower() == 'ept':
-            en_str = energies['Ion_Bins_Text']
-            bins_width = 'Ion_Bins_Width'
-            flux_key = 'Ion_Flux'
-    if type(en_channel) == list:
-        energy_low = en_str[en_channel[0]][0].split('-')[0]
-
-        energy_up = en_str[en_channel[-1]][0].split('-')[-1]
-
-        en_channel_string = energy_low + '-' + energy_up
-
-        if len(en_channel) > 2:
-            raise Exception('en_channel must have len 2 or less!')
-        if len(en_channel) == 2:
-            DE = energies[bins_width]
-            try:
-                df = df[flux_key]
-            except (AttributeError, KeyError):
-                None
-            for bins in np.arange(en_channel[0], en_channel[-1]+1):
-                if bins == en_channel[0]:
-                    I_all = df[f'{flux_key}_{bins}'] * DE[bins]
-                else:
-                    I_all = I_all + df[f'{flux_key}_{bins}'] * DE[bins]
-            DE_total = np.sum(DE[(en_channel[0]):(en_channel[-1]+1)])
-            flux_out = pd.DataFrame({'flux': I_all/DE_total}, index=df.index)
-        else:
-            en_channel = en_channel[0]
-            flux_out = pd.DataFrame({'flux': df[f'{flux_key}'][f'{flux_key}_{en_channel}']}, index=df.index)
-            en_channel_string = en_str[en_channel][0]
-    else:
-        en_channel_string = en_str[en_channel][0]
-        flux_out = pd.DataFrame({'flux': df[f'{flux_key}'][f'{flux_key}_{en_channel}']}, index=df.index)
-    return flux_out, en_channel_string
-
-
-def bepicolombo_sixs_stack(path, date, side):
-    # def bepicolombo_sixs_stack(path, date, side, species):
-
-    # side is the index of the file here
-    try:
-        try:
-            filename = f"{path}/sixs_phys_data_{date}_side{side}.csv"
-            df = pd.read_csv(filename)
-        except FileNotFoundError:
-            # try alternative file name format
-            filename = f"{path}/{date.strftime('%Y%m%d')}_side{side}.csv"
-            df = pd.read_csv(filename)
-            times = pd.to_datetime(df['TimeUTC'])
-
-        # list comprehension because the method can't be applied onto the array "times"
-        times = [t.tz_convert(None) for t in times]
-        df.index = np.array(times)
-        df = df.drop(columns=['TimeUTC'])
-
-        # choose the subset of desired particle species
-        # if species=="ion":
-        #     df = df[[f"P{i}" for i in range(1,10)]]
-        # if species=="ele":
-        #     df = df[[f"E{i}" for i in range(1,8)]]
-
-    except FileNotFoundError:
-        print(f'Unable to open {filename}')
-        df = pd.DataFrame()
-        filename = ''
-
-    return df, filename
-
-
-def bepi_sixs_load(startdate, enddate, side, path):
-    dates = pd.date_range(startdate, enddate)
-
-    # read files into Pandas dataframes:
-    df, file = bepicolombo_sixs_stack(path, startdate, side=side)
-    if len(dates) > 1:
-        for date in dates[1:]:
-            t_df, file = bepicolombo_sixs_stack(path, date.date(), side=side)
-            df = pd.concat([df, t_df])
-
-    channels_dict = {"Energy_Bin_str": {'E1': '71 keV', 'E2': '106 keV', 'E3': '169 keV', 'E4': '280 keV', 'E5': '960 keV', 'E6': '2240 keV', 'E7': '8170 keV',
-                                        'P1': '1.1 MeV', 'P2': '1.2 MeV', 'P3': '1.5 MeV', 'P4': '2.3 MeV', 'P5': '4.0 MeV', 'P6': '8.0 MeV', 'P7': '15.0 MeV', 'P8': '25.1 MeV', 'P9': '37.3 MeV'},
-                     "Electron_Bins_Low_Energy": np.array([55, 78, 134, 235, 1000, 1432, 4904]),
-                     "Electron_Bins_High_Energy": np.array([92, 143, 214, 331, 1193, 3165, 10000]),
-                     "Ion_Bins_Low_Energy": np.array([0.001, 1.088, 1.407, 2.139, 3.647, 7.533, 13.211, 22.606, 29.246]),
-                     "Ion_Bins_High_Energy": np.array([1.254, 1.311, 1.608, 2.388, 4.241, 8.534, 15.515, 28.413, 40.0])}
-    return df, channels_dict
-
-
-def calc_av_en_flux_sixs(df, channel, species):
-    """
-    This function averages the flux of two energy channels of BepiColombo/SIXS into a combined energy channel
-    channel numbers counted from 1
-
-    Parameters
-    ----------
-    df : pd.DataFrame
-        DataFrame containing HET data
-    channel : int or list
-        energy channel or list with first and last channel to be used
-    species : string
-        'e', 'electrons', 'p', 'protons'
-
-    Returns
-    -------
-    flux: pd.DataFrame
-        channel-averaged flux
-    en_channel_string: str
-        string containing the energy information of combined channel
-    """
-
-    # define constant geometric factors
-    GEOMFACTOR_PROT8 = 5.97E-01
-    GEOMFACTOR_PROT9 = 4.09E+00
-    GEOMFACTOR_ELEC5 = 1.99E-02
-    GEOMFACTOR_ELEC6 = 1.33E-01
-    GEOMFACTOR_PROT_COMB89 = 3.34
-    GEOMFACTOR_ELEC_COMB56 = 0.0972
-
-    if species in ['p', 'protons']:
-        if channel == [8, 9]:
-            countrate = df['P8'] * GEOMFACTOR_PROT8 + df['P9'] * GEOMFACTOR_PROT9
-            flux = countrate / GEOMFACTOR_PROT_COMB89
-            en_channel_string = '37 MeV'
-        else:
-            print('No valid channel combination selected.')
-            flux = pd.Series()
-            en_channel_string = ''
-
-    if species in ['e', 'electrons']:
-        if channel == [5, 6]:
-            countrate = df['E5'] * GEOMFACTOR_ELEC5 + df['E6'] * GEOMFACTOR_ELEC6
-            flux = countrate / GEOMFACTOR_ELEC_COMB56
-            en_channel_string = '1.4 MeV'
-        else:
-            print('No valid channel combination selected.')
-            flux = pd.Series()
-            en_channel_string = ''
-
-    return flux, en_channel_string
-
-
 # some plot options
 intensity_label = 'Flux\n/(s cm² sr MeV)'
 linewidth = 3  # 1.5
 outpath = None  # os.getcwd()
 plot_e_100 = False
-plot_e_1 = True
+plot_e_1 = False
 plot_p = True
+plot_p_maven = True
 save_fig = True
 outpath = 'plots/'  # '/Users/dresing/Documents/Proposals/SERPENTINE_H2020/Cycle25_Multi-SC_SEP_Event_List/Multi_sc_plots'
 
@@ -297,16 +113,41 @@ outfile = f'{outpath}{os.sep}Multi_sc_plot_{startdate.date()}_{plot_period}_{ave
 
 if Bepi:
     # av_bepi = 10
-    sixs_resample = averaging  # '10min'
+    sixs_resample = averaging2  # '10min'
     sixs_ch_e1 = 5  # [5, 6]  # => 5
     sixs_ch_e100 = 2
     sixs_ch_p = 8  # [8, 9]  # we want 'P8'-'P9' averaged
     if lower_proton:
         sixs_ch_p = [7]
+    sixs_ch_p_maven = 6  # 7
     sixs_side = 2
     sixs_color = 'orange'  # seaborn_colorblind[4]  # orange?
     # sixs_path = '/home/gieseler/uni/bepi/data/bc_mpo_sixs/data_csv/cruise/sixs-p/raw'
-    sixs_path = '/home/jagies/data/bepi/bc_mpo_sixs/data_csv/cruise/sixs-p/raw'
+    sixs_path = '/Users/jagies/data/bepi/bc_mpo_sixs/data_csv/cruise/sixs-p/raw'
+if Maven:
+    maven_resample = averaging  # '10min'
+    # maven_ch_e1 = 0
+    maven_ch_e100 = 9  # 11
+    # if higher_e100:
+    #     maven_ch_e100 = 4
+    maven_ch_p = 27  #0
+    if lower_proton:
+        maven_ch_p = 27  # 26
+    maven_ch_p_new_1 = 0
+    maven_ch_p_new_2 = 0
+    maven_color = 'chocolate'  # seaborn_colorblind[4]  # orange?
+    maven_path = 'plots/march_13/'
+    maven_efname = 'Mar2023NDresing_mvn_5min_SEP1F_elec_EFLUX_open.txt'
+    maven_ifname = 'Mar2023NDresing_mvn_5min_SEP1F_ion_EFLUX_open.txt'
+    maven_ifname_new_1 = 'Mar2023NDresing_mdap_dint_md1_sta.txt'
+    maven_ifname_new_2 = 'Mar2023NDresing_mdap_dint_md1sub_sta.txt'
+    maven_time_format = '%Y-%m-%d/%H:%M:%S.%f'
+    maven_e_channels = [21.0497, 22.4964, 23.9430, 26.1130, 29.0062, 32.6228, 37.6860, 44.1959, 52.8757, 64.4487, 79.6384, 99.8912, 126.654, 161.373, 206.942]
+    maven_p_channels = [20.8326, 22.2503, 23.6680, 25.7945, 28.6298, 32.1740, 37.1359, 43.5155, 52.0215, 63.3630, 78.2486, 98.0961, 124.323, 158.347, 203.004,
+                        261.838, 339.810, 442.592, 577.272, 755.190, 989.816, 1298.87, 1706.45, 2243.04, 2949.05, 3879.05, 5111.72, 6687.22]
+    maven_p_channels_new_1 = ['23 - 27.4 MeV']
+    maven_p_channels_new_2 = ['13.0 - 17.3 MeV', '18.3 - 24.4 MeV', '25.9 - 34.5 MeV', '36.5 - 48.7 MeV', '51.6 - 68.8 MeV', '72.9 - 102.9 MeV']
+
 if SOHO:
     soho_ephin_color = 'k'
     soho_erne_color = 'k'  # seaborn_colorblind[5]  # 'green'
@@ -314,11 +155,12 @@ if SOHO:
     soho_erne_resample = averaging  # '30min'
     soho_ephin_resample = averaging  # '30min'
     # soho_path = '/home/gieseler/uni/soho/data/'
-    soho_path = '/home/jagies/data/soho/'
+    soho_path = '/Users/jagies/data/soho/'
     if erne:
-        erne_p_ch = 2  # [3, 4]  # [0]  # [4,5]  # 2
+        erne_p_ch = [2, 3]  # [3, 4]  # [0]  # [4,5]  # 2
         if lower_proton:
             erne_p_ch = [0]
+        erne_p_ch_maven = 0
     if ephin_e:
         ephin_ch_e1 = 'E150'  # 'E1300'
         # ephin_e_intercal = 1/14.
@@ -326,27 +168,29 @@ if SOHO:
     #     ephin_ch_p = 'p25'
 if SOLO:
     solo_ept_color = seaborn_colorblind[5]  # 'blue'
-    solo_het_color = seaborn_colorblind[0]  # 'blue' # seaborn_colorblind[1]
+    solo_het_color = seaborn_colorblind[5]  # seaborn_colorblind[0]  # 'blue' # seaborn_colorblind[1]
     sector = 'sun'
     ept_ch_e100 = [14, 18]  # [25]
     het_ch_e1 = [0]  # [0, 1]  # cf. het_energies
-    ept_ch_p = [50, 56]  # 50-56
-    het_ch_p = [16, 18]  # [19, 24]  # [18, 19]  # cf. het_energies
+    ept_ch_p = 63  # [50, 56]  # 50-56
+    het_ch_p = [18, 19]  # [19, 24]  # [18, 19]  # cf. het_energies
+    het_ch_p_maven = [11, 13]
     if lower_proton:
         het_ch_p = [11, 12]
-    solo_ept_resample = averaging
-    solo_het_resample = averaging
+    solo_ept_resample = averaging2
+    solo_het_resample = averaging2
     # solo_path = '/home/gieseler/uni/solo/data/'
-    solo_path = '/home/jagies/data/solo/'
+    solo_path = '/Users/jagies/data/solo/'
 if STEREO:
     stereo_sept_color = 'orangered'  # seaborn_colorblind[3]  #
     stereo_het_color = 'orangered'  # seaborn_colorblind[3]  # 'coral'
     stereo_let_color = 'orangered'  # seaborn_colorblind[3]  # 'coral'
     sector = 'sun'
     sept_ch_e100 = [6, 7]  # [12, 16]
-    sept_ch_p = [25, 30]
+    sept_ch_p = 31  # [25, 30]
     st_het_ch_e = 0  # [0, 1]   cf. sta_het_meta['channels_dict_df_e']
-    st_het_ch_p = 3  # [5, 8]  # 3  #7 #3   cf. sta_het_meta['channels_dict_df_p']
+    st_het_ch_p = [4]  # [5, 8]  # 3  #7 #3   cf. sta_het_meta['channels_dict_df_p']
+    st_het_ch_p_maven = [0, 1]
     if lower_proton:
         st_het_ch_p = [0]
     let_ch = 5  # 1
@@ -354,26 +198,27 @@ if STEREO:
     sta_sept_resample = averaging
     sta_let_resample = averaging
     # stereo_path = '/home/gieseler/uni/stereo/data/'
-    stereo_path = '/home/jagies/data/stereo/'
+    stereo_path = '/Users/jagies/data/stereo/'
 if WIND:
-    wind_color = 'dimgrey'
+    wind_color = 'k'  # 'dimgrey'
     wind3dp_ch_e100 = 3
-    wind3dp_ch_p = 6
+    wind3dp_ch_p = 8  # 6
     wind_3dp_resample = averaging  # '30min'
     wind_3dp_threshold = None  # 1e3/1e6  # None
     # wind_path = '/home/gieseler/uni/wind/data/'
-    wind_path = '/home/jagies/data/wind/'
+    wind_path = '/Users/jagies/data/wind/'
 if PSP:
     psp_epilo_ch_e100 = [4, 5]  # cf. psp_epilo_energies
     psp_het_ch_e = [4, 5]  # [3, 10]  # cf. psp_het_energies
     psp_het_ch_p = [7]  # [8, 9]  # cf. psp_het_energies
+    psp_het_ch_p_maven = [1]  # [4]
     if lower_proton:
         psp_het_ch_p = [4]
     psp_epilo_channel = 'F'
     psp_epilo_viewing = 3  # 3="sun", 7="antisun"
     psp_epilo_threshold = None  # 1e2  # None
     # psp_path = '/home/gieseler/uni/psp/data/'
-    psp_path = '/home/jagies/data/psp/'
+    psp_path = '/Users/jagies/data/psp/'
     psp_het_resample = averaging
     psp_epilo_resample = averaging
     psp_het_color = 'blueviolet'
@@ -498,6 +343,27 @@ if Bepi:
         sixs_df_p = sixs_df[[f"P{i}" for i in range(1, 10)]]
         sixs_df_e = sixs_df[[f"E{i}" for i in range(1, 8)]]
 
+if Maven:
+    print('loading Maven')
+    maven_e = pd.read_csv(maven_path+maven_efname, sep=r"\s+",
+                          names=['Time', 'E0', 'E1', 'E2', 'E3', 'E4', 'E5', 'E6', 'E7', 'E8', 'E9', 'E10', 'E11', 'E12', 'E13', 'E14'])
+    maven_e.index = pd.to_datetime(maven_e['Time'], errors='coerce')
+    maven_e.drop('Time', axis=1, inplace=True)
+
+    maven_p = pd.read_csv(maven_path+maven_ifname, sep=r"\s+",
+                          names=['Time', 'E0', 'E1', 'E2', 'E3', 'E4', 'E5', 'E6', 'E7', 'E8', 'E9', 'E10', 'E11', 'E12', 'E13', 'E14', 'E15',
+                                 'E16', 'E17', 'E18', 'E19', 'E20', 'E21', 'E22', 'E23', 'E24', 'E25', 'E26', 'E27'])
+    maven_p.index = pd.to_datetime(maven_p['Time'], errors='coerce')
+    maven_p.drop('Time', axis=1, inplace=True)
+
+    maven_p_new_1 = pd.read_csv(maven_path+maven_ifname_new_1, sep=r"\s+", names=['Time', 'E0'])
+    maven_p_new_1.index = pd.to_datetime(maven_p_new_1['Time'], errors='coerce')
+    maven_p_new_1.drop('Time', axis=1, inplace=True)
+
+    maven_p_new_2 = pd.read_csv(maven_path+maven_ifname_new_2, sep=r"\s+", names=['Time', 'E0', 'E1', 'E2', 'E3', 'E4', 'E5'])
+    maven_p_new_2.index = pd.to_datetime(maven_p_new_2['Time'], errors='coerce')
+    maven_p_new_2.drop('Time', axis=1, inplace=True)
+
 """ AVERAGE ENERGY CHANNELS """
 ####################################################
 if SOLO:
@@ -515,14 +381,14 @@ if SOLO:
                 #         Electron_Flux_cont[tt, :] = np.matmul(ion_cont_corr_matrix, df_ept_p.values[tt, :])
                 #     df_ept_e = df_ept_e - Electron_Flux_cont
 
-                df_ept_e, ept_chstring_e = calc_av_en_flux_EPD(ept_e, ept_energies, ept_ch_e100, 'e', 'ept')
+                df_ept_e, ept_chstring_e = calc_av_en_flux_EPD(ept_e, ept_energies, ept_ch_e100, 'ept')
 
                 if isinstance(solo_ept_resample, str):
                     df_ept_e = resample_df(df_ept_e, solo_ept_resample)
             if plot_p:
                 df_ept_p = ept_p['Ion_Flux']
                 ept_en_str_p = ept_energies['Ion_Bins_Text'][:]
-                df_ept_p, ept_chstring_p = calc_av_en_flux_EPD(ept_p, ept_energies, ept_ch_p, 'p', 'ept')
+                df_ept_p, ept_chstring_p = calc_av_en_flux_EPD(ept_p, ept_energies, ept_ch_p, 'ept')
                 if isinstance(solo_ept_resample, str):
                     df_ept_p = resample_df(df_ept_p, solo_ept_resample)
 
@@ -530,14 +396,17 @@ if SOLO:
         if len(het_e) > 0:
             if plot_e_1:
                 print('calc_av_en_flux_HET e')
-                df_het_e, het_chstring_e = calc_av_en_flux_EPD(het_e, het_energies, het_ch_e1, 'e', 'het')
+                df_het_e, het_chstring_e = calc_av_en_flux_EPD(het_e, het_energies, het_ch_e1, 'het')
                 if isinstance(solo_het_resample, str):
                     df_het_e = resample_df(df_het_e, solo_het_resample)
             if plot_p:
                 print('calc_av_en_flux_HET p')
-                df_het_p, het_chstring_p = calc_av_en_flux_EPD(het_p, het_energies, het_ch_p, 'p', 'het')
+                df_het_p, het_chstring_p = calc_av_en_flux_EPD(het_p, het_energies, het_ch_p, 'het')
                 if isinstance(solo_het_resample, str):
                     df_het_p = resample_df(df_het_p, solo_het_resample)
+                df_het_p_maven, het_chstring_p_maven = calc_av_en_flux_EPD(het_p, het_energies, het_ch_p_maven, 'het')
+                if isinstance(solo_het_resample, str):
+                    df_het_p_maven = resample_df(df_het_p_maven, solo_het_resample)
 
 if STEREO:
     if sept_e:
@@ -573,6 +442,10 @@ if STEREO:
         else:
             sta_het_avg_p = []
             st_het_chstring_p = ''
+        if type(st_het_ch_p_maven) == list and len(sta_het_df) > 0:
+            sta_het_avg_p_maven, st_het_chstring_p_maven = calc_av_en_flux_ST_HET(sta_het_df.filter(like='Proton'),
+                                                                      sta_het_meta['channels_dict_df_p'],
+                                                                      st_het_ch_p_maven, species='p')
 if SOHO:
     if erne:
         if type(erne_p_ch) == list and len(soho_erne) > 0:
@@ -580,7 +453,7 @@ if SOHO:
                                                                          erne_energies['channels_dict_df_p'],
                                                                          erne_p_ch,
                                                                          species='p',
-                                                                         sensor='HET')
+                                                                         sensor='HET')                                                    
 if Bepi:
     if len(sixs_df) > 0:
         # 1 MeV electrons:
@@ -601,6 +474,9 @@ if Bepi:
         if type(sixs_ch_p) == int:
             sixs_df_p25 = sixs_df_p[f'P{sixs_ch_p}']
             sixs_p25_en_channel_string = sixs_meta['Energy_Bin_str'][f'P{sixs_ch_p}']
+        if type(sixs_ch_p_maven) == int:
+            sixs_df_p_maven = sixs_df_p[f'P{sixs_ch_p_maven}']
+            sixs_p_maven_en_channel_string = sixs_meta['Energy_Bin_str'][f'P{sixs_ch_p_maven}']
         # 100 keV electrons withouth averaging:
         sixs_df_e100 = sixs_df_e[f'E{sixs_ch_e100}']
         sixs_e100_en_channel_string = sixs_meta['Energy_Bin_str'][f'E{sixs_ch_e100}']
@@ -609,6 +485,16 @@ if Bepi:
             sixs_df_e100 = resample_df(sixs_df_e100, sixs_resample)
             sixs_df_e1 = resample_df(sixs_df_e1, sixs_resample)
             sixs_df_p25 = resample_df(sixs_df_p25, sixs_resample)
+            sixs_df_p_maven = resample_df(sixs_df_p_maven, sixs_resample)
+
+if Maven:
+    if isinstance(maven_resample, str):
+        # maven_e = maven_e.resample(maven_resample,label='left').mean()
+        # maven_e.index = maven_e.index + pd.tseries.frequencies.to_offset(pd.Timedelta(maven_resample)/2)
+        maven_e = resample_df(maven_e, maven_resample)
+        maven_p = resample_df(maven_p, maven_resample)
+        maven_p_new_1 = resample_df(maven_p_new_1, maven_resample)
+        maven_p_new_2 = resample_df(maven_p_new_2, maven_resample)
 
 if PSP:
     if plot_e_1:
@@ -619,13 +505,20 @@ if PSP:
             df_psp_het_e, psp_het_chstring_e = calc_av_en_flux_PSP_EPIHI(psp_het, psp_het_energies, psp_het_ch_e, 'e', 'het', 'A')
             if isinstance(psp_het_resample, str):
                 df_psp_het_e = resample_df(df_psp_het_e, psp_het_resample)
-        if plot_p:
-            print('calc_av_en_flux_PSP_EPIHI p')
-            if type(psp_het_ch_p) == int:
-                psp_het_ch_p = [psp_het_ch_p]
-            df_psp_het_p, psp_het_chstring_p = calc_av_en_flux_PSP_EPIHI(psp_het, psp_het_energies, psp_het_ch_p, 'p', 'het', 'A')
-            if isinstance(psp_het_resample, str):
-                df_psp_het_p = resample_df(df_psp_het_p, psp_het_resample)
+    if plot_p:
+        print('calc_av_en_flux_PSP_EPIHI p')
+        if type(psp_het_ch_p) == int:
+            psp_het_ch_p = [psp_het_ch_p]
+        df_psp_het_p, psp_het_chstring_p = calc_av_en_flux_PSP_EPIHI(psp_het, psp_het_energies, psp_het_ch_p, 'p', 'het', 'A')
+        if isinstance(psp_het_resample, str):
+            df_psp_het_p = resample_df(df_psp_het_p, psp_het_resample)
+    if plot_p_maven:
+        print('calc_av_en_flux_PSP_EPIHI p_maven')
+        if type(psp_het_ch_p_maven) == int:
+            psp_het_ch_p_maven = [psp_het_ch_p_maven]
+        df_psp_het_p_maven, psp_het_chstring_p_maven = calc_av_en_flux_PSP_EPIHI(psp_het, psp_het_energies, psp_het_ch_p_maven, 'p', 'het', 'A')
+        if isinstance(psp_het_resample, str):
+            df_psp_het_p_maven = resample_df(df_psp_het_p_maven, psp_het_resample)
     if plot_e_100:
         if len(psp_epilo) > 0:
             print('calc_av_en_flux_PSP_EPILO e 100 keV')
@@ -660,6 +553,8 @@ if plot_e_1:
 if plot_e_100:
     panels = panels + 1
 if plot_p:
+    panels = panels + 1
+if plot_p_maven:
     panels = panels + 1
 # fig, axes = plt.subplots(panels, figsize=(24, 15), dpi=200, sharex=True)
 fig, axes = plt.subplots(panels, figsize=(20, 13), dpi=200, sharex=True)
@@ -787,19 +682,21 @@ if plot_p:
         # ax.plot(sixs_p.index, sixs_p[sixs_ch_p], color='orange', linewidth=linewidth, label='BepiColombo/SIXS '+sixs_chstrings[sixs_ch_p]+f' side {sixs_side_p}', drawstyle='steps-mid')
         if len(sixs_df) > 0:
             ax.plot(sixs_df_p25.index, sixs_df_p25, color=sixs_color, linewidth=linewidth, label='BepiColombo\nSIXS '+sixs_p25_en_channel_string+f'\nside {sixs_side}', drawstyle='steps-mid')
+    if Maven:
+        ax.plot(pd.to_datetime(maven_p_new_1.index, format=maven_time_format), maven_p_new_1[f'E{maven_ch_p_new_1}'], color=maven_color, linewidth=linewidth, label=f'Maven {maven_p_channels_new_1[maven_ch_p_new_1]}', drawstyle='steps-mid')
     if SOLO:
         if het and (len(het_p) > 0):
             ax.plot(df_het_p.index, df_het_p, linewidth=linewidth, color=solo_het_color, label='SOLO\nHET '+het_chstring_p.replace('00 ', ' ')+f'\n{sector}', drawstyle='steps-mid')
     if STEREO:
-        if sept_p:
-            if type(sept_ch_p) == list and len(sta_sept_avg_p) > 0:
-                ax.plot(sta_sept_df_p.index, sta_sept_avg_p, color=stereo_sept_color, linewidth=linewidth, label='STEREO/SEPT '+sept_chstring_p+f' {sector}', drawstyle='steps-mid')
-            elif type(sept_ch_p) == int:
-                ax.plot(sta_sept_df_p.index, sta_sept_df_p[f'ch_{sept_ch_p}'], color=stereo_sept_color, linewidth=linewidth, label='STEREO/SEPT '+sta_sept_dict_p.loc[sept_ch_p]['ch_strings']+f' {sector}', drawstyle='steps-mid')
+        # if sept_p:
+        #     if type(sept_ch_p) == list and len(sta_sept_avg_p) > 0:
+        #         ax.plot(sta_sept_df_p.index, sta_sept_avg_p, color=stereo_sept_color, linewidth=linewidth, label='STEREO/SEPT '+sept_chstring_p+f' {sector}', drawstyle='steps-mid')
+        #     elif type(sept_ch_p) == int:
+        #         ax.plot(sta_sept_df_p.index, sta_sept_df_p[f'ch_{sept_ch_p}'], color=stereo_sept_color, linewidth=linewidth, label='STEREO/SEPT '+sta_sept_dict_p.loc[sept_ch_p]['ch_strings']+f' {sector}', drawstyle='steps-mid')
         if stereo_het:
             if len(sta_het_avg_p) > 0:
                 ax.plot(sta_het_avg_p.index, sta_het_avg_p, color=stereo_het_color,
-                        linewidth=linewidth, label='STEREO\nHET '+st_het_chstring_p, drawstyle='steps-mid')
+                        linewidth=linewidth, label='STEREO-A\nHET '+st_het_chstring_p, drawstyle='steps-mid')
         if let:
             str_ch = {0: 'P1', 1: 'P2', 2: 'P3', 3: 'P4'}
             ax.plot(sta_let_df.index, sta_let_df[f'H_unsec_flux_{let_ch}'], color=stereo_let_color, linewidth=linewidth, label='STERE/LET '+let_chstring[let_ch], drawstyle='steps-mid')
@@ -820,17 +717,105 @@ if plot_p:
     ax.set_yscale('log')
     ax.set_ylabel(intensity_label)
     # ax.legend(loc='center left', bbox_to_anchor=(1, 0.5), title='>25 MeV Protons/Ions')
-    ax.legend(loc='center left', bbox_to_anchor=(1, 0.5), title='Protons/Ions')
+    ax.legend(loc='center left', bbox_to_anchor=(1, 0.5))  #, title='Protons/Ions')
+    bbox = dict(boxstyle='round', fc='white', ec='black')
+    ax.text(0.97, 0.90, 'Higher energy protons', bbox=bbox, transform=ax.transAxes, horizontalalignment='right')
     axnum = axnum+1
+
+if plot_p_maven:
+    if panels == 1:
+        ax = axes
+    else:
+        ax = axes[axnum]
+    if PSP:
+        if len(psp_het) > 0:
+            # ax.plot(psp_het.index, psp_het[f'A_H_Flux_{psp_het_ch_p}'], color=psp_het_color, linewidth=linewidth,
+            #         label='PSP '+r"$\bf{(count\ rates)}$"+'\nISOIS-EPIHI-HET '+psp_het_energies['H_ENERGY_LABL'][psp_het_ch_p][0].replace(' ', '').replace('-', ' - ').replace('MeV', ' MeV')+'\nA (sun)',
+            #         drawstyle='steps-mid')
+            ax.plot(df_psp_het_p_maven.index, df_psp_het_p_maven, color=psp_het_color, linewidth=linewidth,
+                    label='PSP '+'\nISOIS-EPIHI '+psp_het_chstring_p_maven+'\nA (sun)',
+                    drawstyle='steps-mid')
+    if Bepi:
+        # ax.plot(sixs_p.index, sixs_p[sixs_ch_p], color='orange', linewidth=linewidth, label='BepiColombo/SIXS '+sixs_chstrings[sixs_ch_p]+f' side {sixs_side_p}', drawstyle='steps-mid')
+        if len(sixs_df) > 0:
+            ax.plot(sixs_df_p_maven.index, sixs_df_p_maven, color=sixs_color, linewidth=linewidth, label='BepiColombo\nSIXS '+sixs_p_maven_en_channel_string+f'\nside {sixs_side}', drawstyle='steps-mid')
+    if Maven:
+        ax.plot(pd.to_datetime(maven_p.index, format=maven_time_format), maven_p[f'E{maven_ch_p}'], color=maven_color, linewidth=linewidth, label=f'Maven {maven_p_channels[maven_ch_p]} keV', drawstyle='steps-mid')
+        # ax.plot(pd.to_datetime(maven_p_new_2.index, format=maven_time_format), maven_p_new_2[f'E{maven_ch_p_new_2}'], color=maven_color, linewidth=linewidth, label=f'Maven {maven_p_channels_new_2[maven_ch_p_new_2]}', drawstyle='steps-mid')
+    if SOLO:
+        if het_maven:
+            if het and (len(het_p) > 0):
+                ax.plot(df_het_p_maven.index, df_het_p_maven, linewidth=linewidth, color=solo_het_color, label='SOLO\nHET '+het_chstring_p_maven.replace('00 ', ' ')+f'\n{sector}', drawstyle='steps-mid')
+        if ept and (len(ept_p) > 0):
+            ax.plot(df_ept_p.index, df_ept_p, linewidth=linewidth, color=solo_ept_color, label=f'SOLO\nEPT '+ept_chstring_p+f'\n{sector}', drawstyle='steps-mid')
+
+            
+    if STEREO:
+        if sept_p:
+            if type(sept_ch_p) == list and len(sta_sept_avg_p) > 0:
+                ax.plot(sta_sept_df_p.index, sta_sept_avg_p, color=stereo_sept_color, linewidth=linewidth, label=f'STEREO\nSEPT {sept_chstring_p}\n{sector}', drawstyle='steps-mid')
+            elif type(sept_ch_p) == int:
+                ax.plot(sta_sept_df_p.index, sta_sept_df_p[f'ch_{sept_ch_p}'], color=stereo_sept_color, linewidth=linewidth, label=f'STEREO\nSEPT {sta_sept_dict_p.loc[sept_ch_p]['ch_strings']}\n{sector}', drawstyle='steps-mid')
+        if stereo_het:
+            if sta_het_maven:
+                if len(sta_het_avg_p_maven) > 0:
+                    ax.plot(sta_het_avg_p_maven.index, sta_het_avg_p_maven, color=stereo_het_color,
+                            linewidth=linewidth, label='STEREO-A\nHET '+st_het_chstring_p_maven, drawstyle='steps-mid')
+        if let:
+            str_ch = {0: 'P1', 1: 'P2', 2: 'P3', 3: 'P4'}
+            ax.plot(sta_let_df.index, sta_let_df[f'H_unsec_flux_{let_ch}'], color=stereo_let_color, linewidth=linewidth, label='STERE/LET '+let_chstring[let_ch], drawstyle='steps-mid')
+    if SOHO:
+        if erne:
+            if erne_maven:
+                if type(erne_p_ch_maven) == int:
+                    if len(soho_erne) > 0:
+                        ax.plot(soho_erne.index, soho_erne[f'PH_{erne_p_ch_maven}'], color=soho_erne_color, linewidth=linewidth, label='SOHO\nERNE/HED '+erne_chstring[erne_p_ch_maven], drawstyle='steps-mid')
+    # if SOHO:
+    #     if erne:
+    #         if type(erne_p_ch) == list and len(soho_erne_avg_p) > 0:
+    #             ax.plot(soho_erne_avg_p.index, soho_erne_avg_p, color=soho_erne_color, linewidth=linewidth, label='SOHO\nERNE/HED '+soho_erne_chstring_p, drawstyle='steps-mid')
+    #         elif type(erne_p_ch) == int:
+    #             if len(soho_erne) > 0:
+    #                 ax.plot(soho_erne.index, soho_erne[f'PH_{erne_p_ch}'], color=soho_erne_color, linewidth=linewidth, label='SOHO\nERNE/HED '+erne_chstring[erne_p_ch], drawstyle='steps-mid')
+    #     # if ephin_p:
+    #     #     ax.plot(ephin['date'], ephin[ephin_ch_p][0], color=soho_ephin_color, linewidth=linewidth, label='SOHO/EPHIN '+ephin[ephin_ch_p][1], drawstyle='steps-mid')
+    # if WIND:
+        # multiply by 1e6 to get per MeV
+    #    ax.plot(wind3dp_p_df.index, wind3dp_p_df[f'FLUX_{wind3dp_ch_p}']*1e6, color=wind_color, linewidth=linewidth, label='Wind\n3DP '+str(round(wind3dp_p_df[f'ENERGY_{wind3dp_ch_p}'].mean()/1000., 2)) + ' keV', drawstyle='steps-mid')
+    if WIND:
+        if wind3dp_p:
+            # multiply by 1e6 to get per MeV
+            # ax.plot(wind3dp_p_df.index, wind3dp_p_df[f'FLUX_{wind3dp_ch_p}']*1e6, color=wind_color, linewidth=linewidth, label='Wind/3DP omni '+str(round(wind3dp_p_df[f'ENERGY_{wind3dp_ch_p}'].mean()/1000., 2)) + ' keV', drawstyle='steps-mid')
+            ax.plot(wind3dp_p_df.index, wind3dp_p_df[f'FLUX_{wind3dp_ch_p}']*1e6, color=wind_color, linewidth=linewidth, label=f'Wind\n3DP {wind3dp_p_meta['channels_dict_df']['Bins_Text'].iloc[wind3dp_ch_p]}\nomni', drawstyle='steps-mid')    
+    # ax.set_ylim(2.05e-5, 4.8e0)
+    # ax.set_ylim(0.00033920545179055416, 249.08996960298424)
+    ax.set_yscale('log')
+    ax.set_ylabel(intensity_label)
+    # ax.legend(loc='center left', bbox_to_anchor=(1, 0.5), title='>25 MeV Protons/Ions')
+    ax.legend(loc='upper left', bbox_to_anchor=(1, 1.05))  # , title='Protons/Ions')
+    bbox = dict(boxstyle='round', fc='white', ec='black')
+    ax.text(0.97, 0.90, 'Lower energy protons/ions', bbox=bbox, transform=ax.transAxes, horizontalalignment='right')
+    axnum = axnum+1
+
+
 # pos = get_horizons_coord('Solar Orbiter', startdate, 'id')
 # dist = np.round(pos.radius.value, 2)
 # fig.suptitle(f'Solar Orbiter/EPD {sector} (R={dist} au)')
+# fig.suptitle(f'Protons/Ions')
 ax.set_xlim(startdate, enddate)
 # ax.set_xlim(dt.datetime(2021, 10, 9, 6, 0), dt.datetime(2021, 10, 9, 11, 0))
 ax.xaxis.set_major_formatter(mdates.DateFormatter('%m-%d\n%H:%M'))
 ax.xaxis.set_major_formatter(mdates.DateFormatter('%b %d\n%H:%M'))
 ax.xaxis.set_minor_locator(AutoMinorLocator(2))
 ax.set_xlabel('Date / Time in year '+str(startdate.year))
+
+for a in axes:
+    a.axvline(dt.datetime(2023, 3, 13, 7, 14), lw=2, color=psp_het_color)
+    a.axvline(dt.datetime(2023, 3, 13, 14, 52), lw=2, color=sixs_color)
+    a.axvline(dt.datetime(2023, 3, 14, 1, 4), lw=2, color=solo_ept_color)
+    a.axvline(dt.datetime(2023, 3, 15, 1, 16), lw=2, color=stereo_sept_color)
+    a.axvline(dt.datetime(2023, 3, 15, 4, 1), lw=2, color='k')  # Wind
+
 plt.tight_layout()
 fig.subplots_adjust(hspace=0.1)
 if save_fig:
