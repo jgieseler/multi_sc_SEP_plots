@@ -344,7 +344,7 @@ if Bepi:
         sixs_df_e = sixs_df[[f"E{i}" for i in range(1, 8)]]
 
 if Maven:
-    print('loading Maven')
+    print('loading MAVEN')
     maven_e = pd.read_csv(maven_path+maven_efname, sep=r"\s+",
                           names=['Time', 'E0', 'E1', 'E2', 'E3', 'E4', 'E5', 'E6', 'E7', 'E8', 'E9', 'E10', 'E11', 'E12', 'E13', 'E14'])
     maven_e.index = pd.to_datetime(maven_e['Time'], errors='coerce')
@@ -683,7 +683,7 @@ if plot_p:
         if len(sixs_df) > 0:
             ax.plot(sixs_df_p25.index, sixs_df_p25, color=sixs_color, linewidth=linewidth, label='BepiColombo\nSIXS '+sixs_p25_en_channel_string+f'\nside {sixs_side}', drawstyle='steps-mid')
     if Maven:
-        ax.plot(pd.to_datetime(maven_p_new_1.index, format=maven_time_format), maven_p_new_1[f'E{maven_ch_p_new_1}'], color=maven_color, linewidth=linewidth, label=f'Maven {maven_p_channels_new_1[maven_ch_p_new_1]}', drawstyle='steps-mid')
+        ax.plot(pd.to_datetime(maven_p_new_1.index, format=maven_time_format), maven_p_new_1[f'E{maven_ch_p_new_1}'], color=maven_color, linewidth=linewidth, label=f'MAVEN {maven_p_channels_new_1[maven_ch_p_new_1]}', drawstyle='steps-mid')
     if SOLO:
         if het and (len(het_p) > 0):
             ax.plot(df_het_p.index, df_het_p, linewidth=linewidth, color=solo_het_color, label='SOLO\nHET '+het_chstring_p.replace('00 ', ' ')+f'\n{sector}', drawstyle='steps-mid')
@@ -740,7 +740,7 @@ if plot_p_maven:
         if len(sixs_df) > 0:
             ax.plot(sixs_df_p_maven.index, sixs_df_p_maven, color=sixs_color, linewidth=linewidth, label='BepiColombo\nSIXS '+sixs_p_maven_en_channel_string+f'\nside {sixs_side}', drawstyle='steps-mid')
     if Maven:
-        ax.plot(pd.to_datetime(maven_p.index, format=maven_time_format), maven_p[f'E{maven_ch_p}'], color=maven_color, linewidth=linewidth, label=f'Maven {maven_p_channels[maven_ch_p]} keV', drawstyle='steps-mid')
+        ax.plot(pd.to_datetime(maven_p.index, format=maven_time_format), maven_p[f'E{maven_ch_p}'], color=maven_color, linewidth=linewidth, label=f'MAVEN {maven_p_channels[maven_ch_p]} keV', drawstyle='steps-mid')
         # ax.plot(pd.to_datetime(maven_p_new_2.index, format=maven_time_format), maven_p_new_2[f'E{maven_ch_p_new_2}'], color=maven_color, linewidth=linewidth, label=f'Maven {maven_p_channels_new_2[maven_ch_p_new_2]}', drawstyle='steps-mid')
     if SOLO:
         if het_maven:
