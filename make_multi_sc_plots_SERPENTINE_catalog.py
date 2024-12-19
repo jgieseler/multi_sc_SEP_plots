@@ -18,7 +18,7 @@ from seppy.loader.stereo import calc_av_en_flux_SEPT, stereo_load
 from seppy.loader.wind import wind3dp_load
 from seppy.util import bepi_sixs_load, calc_av_en_flux_sixs
 from solo_epd_loader import combine_channels as calc_av_en_flux_EPD
-from solo_epd_loader import epd_load
+from solo_epd_loader import epd_load, calc_ept_corrected_e
 from sunpy.coordinates import frames, get_horizons_coord
 from tqdm import tqdm
 
@@ -30,7 +30,7 @@ from tqdm import tqdm
 mode = 'events'
 
 lower_proton = False  # True if 13 MeV protons should be used instead of 25+ MeV
-add_contaminating_channels = False
+add_contaminating_channels = True
 
 # plot vertical lines with previously found shock times provided by https://parker.gsfc.nasa.gov/shocks.html
 plot_shock_times = False
@@ -74,7 +74,7 @@ ephin_e = True  # not included yet!
 # SOLO:
 ept = True
 het = True
-ept_use_corr_e = False  # not included yet!
+ept_use_corr_e = True  # not included yet!
 
 # STEREO:
 sept_e = True
@@ -117,6 +117,100 @@ plt.rcParams['ytick.major.width'] = 2
 plt.rcParams['ytick.minor.size'] = 5
 plt.rcParams['ytick.minor.width'] = 1
 plt.rcParams['axes.linewidth'] = 2.0
+
+
+def calc_av_en_flux_EPD2(df, energies, en_channel, sensor, particles):
+    """
+    Average the fluxes of several adjacent energy channels of one sensor into
+    a combined energy channel.
+
+    Parameters
+    ----------
+    df : pd.DataFrame
+        DataFrame containing electron or proton/ion data of the sensor
+    energies : dict
+        Energy/meta dictionary returned from epd_load (last returned object)
+    en_channel : list of 2 integers
+        Range of adjacent energy channels to be used, e.g. [3, 5] for
+        combining 4th, 5th, and 6th channels (counting starts with 0).
+    sensor : string
+        'ept' or 'het'
+
+    Returns
+    -------
+    pd.DataFrame
+        flux_out : contains channel-averaged flux
+    string
+        en_channel_string : describes the energry range of combined channel
+
+    Raises
+    ------
+    Exception
+        - Sensor 'step' not supported yet.
+        - Lowest EPT channels not supported because of overlapping energies.
+
+    Examples
+    --------
+    Load EPT sun viewing direction level 2 data for Aug 20 to Aug 21, 2020, and
+    combine electron channels 9 to 12 (i.e., 10th to 13th).
+
+    > df_p, df_e, meta = epd_load('ept', 20200820, 20200821, 'l2', 'sun')
+    > df_new, chan_new = combine_channels(df_p, meta, [9, 12], 'ept')
+    """
+    if sensor.lower() == 'step':
+        raise Exception('STEP data not supported yet!')
+        return pd.DataFrame(), ''
+    # if species.lower() in ['e', 'electrons']:
+    if particles == 'e':
+        en_str = energies['Electron_Bins_Text']
+        bins_width = 'Electron_Bins_Width'
+        flux_key = 'Electron_Flux'
+    # if species.lower() in ['p', 'protons', 'i', 'ions', 'h']:
+    elif particles == 'p':
+        if sensor.lower() == 'het':
+            en_str = energies['H_Bins_Text']
+            bins_width = 'H_Bins_Width'
+            flux_key = 'H_Flux'
+        if sensor.lower() == 'ept':
+            en_str = energies['Ion_Bins_Text']
+            bins_width = 'Ion_Bins_Width'
+            flux_key = 'Ion_Flux'
+    if type(en_channel) == list:
+        energy_low = en_str[en_channel[0]][0].split('-')[0]
+        energy_up = en_str[en_channel[-1]][0].split('-')[-1]
+        en_channel_string = energy_low + '-' + energy_up
+
+        if len(en_channel) > 2:
+            raise Exception('en_channel must have 2 elements: start channel and end channel, e.g. [1,3]!')
+        if len(en_channel) == 2:
+            # catch overlapping EPT energy channels and cancel calculation:
+            if sensor.lower() == 'ept' and 'Electron_Flux' in df.keys() and en_channel[0] < 4:
+                raise Exception('Lowest 4 EPT e channels not supported because of overlapping energies!')
+                return pd.DataFrame(), ''
+            if sensor.lower() == 'ept' and 'Electron_Flux' not in df.keys() and en_channel[0] < 9:
+                raise Exception('Lowest 9 EPT ion channels not supported because of overlapping energies!')
+                return pd.DataFrame(), ''
+            # try to convert multi-index dataframe to normal one. if this is already the case, just continue
+            try:
+                df = df[flux_key]
+            except (AttributeError, KeyError):
+                None
+            DE = energies[bins_width]
+            for bins in np.arange(en_channel[0], en_channel[-1]+1):
+                if bins == en_channel[0]:
+                    I_all = df[f'{flux_key}_{bins}'] * DE[bins]
+                else:
+                    I_all = I_all + df[f'{flux_key}_{bins}'] * DE[bins]
+            DE_total = np.sum(DE[(en_channel[0]):(en_channel[-1]+1)])
+            flux_out = pd.DataFrame({'flux': I_all/DE_total}, index=df.index)
+        else:
+            en_channel = en_channel[0]
+            flux_out = pd.DataFrame({'flux': df[flux_key][f'{flux_key}_{en_channel}']}, index=df.index)
+            en_channel_string = en_str[en_channel][0]
+    else:
+        flux_out = pd.DataFrame({'flux': df[flux_key][f'{flux_key}_{en_channel}']}, index=df.index)
+        en_channel_string = en_str[en_channel][0]
+    return flux_out, en_channel_string
 
 
 """
@@ -1056,6 +1150,20 @@ for i in tqdm(range(0, len(dates))):  # standard
                 #     for tt in range(len(df_ept_e)):
                 #         Electron_Flux_cont[tt, :] = np.matmul(ion_cont_corr_matrix, df_ept_p.values[tt, :])
                 #     df_ept_e = df_ept_e - Electron_Flux_cont
+                if ept_use_corr_e:
+                    ept_e2 = ept_e
+                    ept_p2 = ept_p
+                    print('correcting solo/ept e')
+                    if isinstance(solo_ept_resample, str):
+                        ept_e2 = resample_df(ept_e, solo_ept_resample)
+                        ept_p2 = resample_df(ept_p, solo_ept_resample)
+                    df_ept_e_corr = calc_ept_corrected_e(ept_e2, ept_p2)
+
+                    # df_ept_e = df_ept_e[f'Electron_Flux_{ept_ch_e100[0]}']
+                    # ept_chstring_e = ept_energies['Electron_Bins_Text'][ept_ch_e100[0]][0]
+
+                    # TODO: calc_av_en_flux_EPD expects multi-index with df['Electron_Flux']['Electron_Flux_0'], and looks for the first 'Electron_Flux' to check whether this is electron or ion data...
+                    df_ept_e_corr, ept_chstring_e_corr = calc_av_en_flux_EPD2(df_ept_e_corr, ept_energies, ept_ch_e100, 'ept', particles='e')
 
                 df_ept_e, ept_chstring_e = calc_av_en_flux_EPD(ept_e, ept_energies, ept_ch_e100, 'ept')
 
@@ -1234,8 +1342,8 @@ for i in tqdm(range(0, len(dates))):  # standard
         else:
             ax = axes[axnum]
         species_string = 'Electrons'
-        if ept_use_corr_e:
-            species_string = 'Electrons (corrected)'
+        # if ept_use_corr_e:
+        #     species_string = 'Electrons (corrected)'
 
         # plot flare times with arrows on top
         if mode == 'events':
@@ -1272,6 +1380,8 @@ for i in tqdm(range(0, len(dates))):  # standard
                         ax.plot(df_ept_e.index.values, flux_ept[:, ch], linewidth=linewidth, color=solo_ept_color, label='SOLO\nEPT '+ept_en_str_e[ch, 0]+f'\n{sector}', drawstyle='steps-mid')
                 except IndexError:
                     ax.plot(df_ept_e.index.values, flux_ept, linewidth=linewidth, color=solo_ept_color, label=f'SOLO/EPT {sector} '+ept_chstring_e, drawstyle='steps-mid')
+                if ept_use_corr_e:
+                    ax.plot(df_ept_e_corr.index.values, df_ept_e_corr.values, linewidth=linewidth, ls='dashdot', color='magenta', label=f'SOLO/EPT {sector} '+ept_chstring_e+'\n(corrected)', drawstyle='steps-mid')  
             if plot_times:
                 [ax.axvline(i, lw=vlw, color=solo_ept_color) for i in df_solo_onset_e100]
                 [ax.axvline(i, lw=vlw, ls=':', color=solo_ept_color) for i in df_solo_peak_e100]
@@ -1372,8 +1482,8 @@ for i in tqdm(range(0, len(dates))):  # standard
         else:
             ax = axes[axnum]
             species_string = 'Electrons'
-        if ept_use_corr_e:
-            species_string = 'Electrons (corrected)'
+        # if ept_use_corr_e:
+        #     species_string = 'Electrons (corrected)'
 
         if PSP:
             if len(psp_het) > 0:
