@@ -29,8 +29,12 @@ from tqdm import tqdm
 # processing mode: 'regular' (e.g. weekly) or 'events'
 mode = 'events'
 
+# if mode='events', which onset to use: 'classic' or 'pyonset'
+onset = 'classic'
+# onset = 'pyonset'
+
 lower_proton = False  # True if 13 MeV protons should be used instead of 25+ MeV
-add_contaminating_channels = True
+add_contaminating_channels = False
 
 # plot vertical lines with previously found shock times provided by https://parker.gsfc.nasa.gov/shocks.html
 plot_shock_times = False
@@ -50,8 +54,8 @@ else:
     add_bepi_conta_ch = False  # True if contaminaiting Bepi/SIXS ion channel (XXX) should be added to the 100 keV electron panel
 
 if mode == 'regular':
-    first_date = dt.datetime(2022, 1, 4)
-    last_date = dt.datetime(2023, 12, 31)
+    first_date = dt.datetime(2025, 3, 25)
+    last_date = dt.datetime(2025, 7, 31)
     plot_period = '7D'
     averaging = '1h'  # '5min'  # None
 
@@ -87,9 +91,9 @@ wind3dp_e = True
 
 # plot vertical lines with previously found onset and peak times
 if mode == 'regular':
-    plot_times = False
+    plot_times = 'None'
 if mode == 'events':
-    plot_times = True
+    plot_times = onset
 
 #############################################################
 
@@ -175,7 +179,7 @@ def calc_av_en_flux_EPD2(df, energies, en_channel, sensor, particles):
             en_str = energies['Ion_Bins_Text']
             bins_width = 'Ion_Bins_Width'
             flux_key = 'Ion_Flux'
-    if type(en_channel) == list:
+    if type(en_channel) is list:
         energy_low = en_str[en_channel[0]][0].split('-')[0]
         energy_up = en_str[en_channel[-1]][0].split('-')[-1]
         en_channel_string = energy_low + '-' + energy_up
@@ -338,9 +342,12 @@ outpath = 'plots'  # '/Users/dresing/Documents/Proposals/SERPENTINE_H2020/Cycle2
 """
 START LOAD ONSET TIMES
 """
-if plot_times:
+if plot_times != 'None':
     # Load spreadhseet
-    df = pd.read_csv('WP2_multi_sc_catalog - WP2_multi_sc_event_list_draft.csv')
+    if plot_times == 'classic':
+        df = pd.read_csv('WP2_multi_sc_catalog - WP2_multi_sc_event_list_draft.csv')
+    elif plot_times == 'pyonset':
+        df = pd.read_csv('SERPENTINE_SEP_catalog_PyOnset - WP2_multi_sc_event_list_draft.csv')
 
     # get list of flare times
     df_flare_date_str = df['flare date (yyyy-mm-dd)'].values.astype(str)
@@ -349,19 +356,23 @@ if plot_times:
     df_flare_times_str = np.delete(df_flare_times_str, np.where(df_flare_times_str == 'nan'))
     df_flare_times = []
     for i in range(len(df_flare_date_str)):
-        df_flare_times.append(dt.datetime.strptime(f'{df_flare_date_str[i]} {df_flare_times_str[i]}', '%Y-%m-%d %H:%M:%S'))
+            df_flare_times.append(dt.datetime.strptime(f'{df_flare_date_str[i]} {df_flare_times_str[i]}', '%Y-%m-%d %H:%M:%S'))
 
-    def get_times_from_csv_list(df, observer):
+    def get_times_from_csv_list(df, observer, onset='classic'):
         """
         df_onset_p, df_peak_p, df_onset_e100, df_peak_e100, df_onset_e1000, df_peak_e1000 = get_times_from_csv_list(df, 'SOLO')
         """
+        if onset == 'classic':
+            onset_string = 'onset'
+        elif onset == 'pyonset':
+            onset_string = 'PyOnset'
 
         df_solo = df[df.Observer == observer]
 
         # protons
-        df_solo_onset_date_p_str = df_solo['p25MeV onset date (yyyy-mm-dd)'].values.astype(str)
+        df_solo_onset_date_p_str = df_solo[f'p25MeV {onset_string} date (yyyy-mm-dd)'].values.astype(str)
         df_solo_onset_date_p_str = np.delete(df_solo_onset_date_p_str, np.where(df_solo_onset_date_p_str == 'nan'))
-        df_solo_onset_time_p_str = df_solo['p25MeV onset time (HH:MM:SS)'].values.astype(str)
+        df_solo_onset_time_p_str = df_solo[f'p25MeV {onset_string} time (HH:MM:SS)'].values.astype(str)
         df_solo_onset_time_p_str = np.delete(df_solo_onset_time_p_str, np.where(df_solo_onset_time_p_str == 'nan'))
 
         df_solo_peak_date_p_str = df_solo['p25MeV peak date (yyyy-mm-dd)'].values.astype(str)
@@ -378,9 +389,9 @@ if plot_times:
             df_solo_peak_p.append(dt.datetime.strptime(f'{df_solo_peak_date_p_str[i]} {df_solo_peak_time_p_str[i]}', '%Y-%m-%d %H:%M:%S'))
 
         # 100 keV electrons
-        df_solo_onset_date_e100_str = df_solo['e100keV onset date (yyyy-mm-dd)'].values.astype(str)
+        df_solo_onset_date_e100_str = df_solo[f'e100keV {onset_string} date (yyyy-mm-dd)'].values.astype(str)
         df_solo_onset_date_e100_str = np.delete(df_solo_onset_date_e100_str, np.where(df_solo_onset_date_e100_str == 'nan'))
-        df_solo_onset_time_e100_str = df_solo['e100keV onset time (HH:MM:SS)'].values.astype(str)
+        df_solo_onset_time_e100_str = df_solo[f'e100keV {onset_string} time (HH:MM:SS)'].values.astype(str)
         df_solo_onset_time_e100_str = np.delete(df_solo_onset_time_e100_str, np.where(df_solo_onset_time_e100_str == 'nan'))
 
         df_solo_peak_date_e100_str = df_solo['e100keV peak date (yyyy-mm-dd)'].values.astype(str)
@@ -397,9 +408,9 @@ if plot_times:
             df_solo_peak_e100.append(dt.datetime.strptime(f'{df_solo_peak_date_e100_str[i]} {df_solo_peak_time_e100_str[i]}', '%Y-%m-%d %H:%M:%S'))
 
         # 1000 keV (1 MeV) electrons
-        df_solo_onset_date_e1000_str = df_solo['e1MeV onset date (yyyy-mm-dd)'].values.astype(str)
+        df_solo_onset_date_e1000_str = df_solo[f'e1MeV {onset_string} date (yyyy-mm-dd)'].values.astype(str)
         df_solo_onset_date_e1000_str = np.delete(df_solo_onset_date_e1000_str, np.where(df_solo_onset_date_e1000_str == 'nan'))
-        df_solo_onset_time_e1000_str = df_solo['e1MeV onset time (HH:MM:SS)'].values.astype(str)
+        df_solo_onset_time_e1000_str = df_solo[f'e1MeV {onset_string} time (HH:MM:SS)'].values.astype(str)
         df_solo_onset_time_e1000_str = np.delete(df_solo_onset_time_e1000_str, np.where(df_solo_onset_time_e1000_str == 'nan'))
 
         df_solo_peak_date_e1000_str = df_solo['e1MeV peak date (yyyy-mm-dd)'].values.astype(str)
@@ -417,12 +428,12 @@ if plot_times:
 
         return df_solo_onset_p, df_solo_peak_p, df_solo_onset_e100, df_solo_peak_e100, df_solo_onset_e1000, df_solo_peak_e1000
 
-    df_bepi_onset_p, df_bepi_peak_p, df_bepi_onset_e100, df_bepi_peak_e100, df_bepi_onset_e1000, df_bepi_peak_e1000 = get_times_from_csv_list(df, 'BepiColombo')
-    df_solo_onset_p, df_solo_peak_p, df_solo_onset_e100, df_solo_peak_e100, df_solo_onset_e1000, df_solo_peak_e1000 = get_times_from_csv_list(df, 'SOLO')
-    df_sta_onset_p, df_sta_peak_p, df_sta_onset_e100, df_sta_peak_e100, df_sta_onset_e1000, df_sta_peak_e1000 = get_times_from_csv_list(df, 'STEREO-A')
-    df_psp_onset_p, df_psp_peak_p, df_psp_onset_e100, df_psp_peak_e100, df_psp_onset_e1000, df_psp_peak_e1000 = get_times_from_csv_list(df, 'PSP')
-    df_wind_onset_p, df_wind_peak_p, df_wind_onset_e100, df_wind_peak_e100, df_wind_onset_e1000, df_wind_peak_e1000 = get_times_from_csv_list(df, 'L1 (SOHO/Wind)')  # previously 'Wind'
-    df_soho_onset_p, df_soho_peak_p, df_soho_onset_e100, df_soho_peak_e100, df_soho_onset_e1000, df_soho_peak_e1000 = get_times_from_csv_list(df, 'L1 (SOHO/Wind)')  # previously 'SOHO'
+    df_bepi_onset_p, df_bepi_peak_p, df_bepi_onset_e100, df_bepi_peak_e100, df_bepi_onset_e1000, df_bepi_peak_e1000 = get_times_from_csv_list(df, 'BepiColombo', onset=onset)
+    df_solo_onset_p, df_solo_peak_p, df_solo_onset_e100, df_solo_peak_e100, df_solo_onset_e1000, df_solo_peak_e1000 = get_times_from_csv_list(df, 'SOLO', onset=onset)
+    df_sta_onset_p, df_sta_peak_p, df_sta_onset_e100, df_sta_peak_e100, df_sta_onset_e1000, df_sta_peak_e1000 = get_times_from_csv_list(df, 'STEREO-A', onset=onset)
+    df_psp_onset_p, df_psp_peak_p, df_psp_onset_e100, df_psp_peak_e100, df_psp_onset_e1000, df_psp_peak_e1000 = get_times_from_csv_list(df, 'PSP', onset=onset)
+    df_wind_onset_p, df_wind_peak_p, df_wind_onset_e100, df_wind_peak_e100, df_wind_onset_e1000, df_wind_peak_e1000 = get_times_from_csv_list(df, 'L1 (SOHO/Wind)', onset=onset)  # previously 'Wind'
+    df_soho_onset_p, df_soho_peak_p, df_soho_onset_e100, df_soho_peak_e100, df_soho_onset_e1000, df_soho_peak_e1000 = get_times_from_csv_list(df, 'L1 (SOHO/Wind)', onset=onset)  # previously 'SOHO'
 
     # obtain a list of all onset datetime
     all_onsets = df_bepi_onset_p + df_bepi_onset_e100 + df_bepi_onset_e1000 + df_solo_onset_p + df_solo_onset_e100 + df_solo_onset_e1000 + df_sta_onset_p + df_sta_onset_e100 + df_sta_onset_e1000 + df_psp_onset_p + df_psp_onset_e100 + df_psp_onset_e1000 + df_wind_onset_p + df_wind_onset_e100 + df_wind_onset_e1000 + df_soho_onset_p + df_soho_onset_e100 + df_soho_onset_e1000
@@ -481,7 +492,7 @@ END LOAD SHOCK TIMES
 Create event time list for SEPserver
 """
 # Needs plot_times=True to create list 'all_onset_dates_first' above!
-if plot_times:
+if plot_times != 'None':
     # negative_offset = pd.Timedelta('5h')  # set to '0h' to disable
     if mode == 'events':
         plot_period = ('72h')
@@ -614,7 +625,7 @@ def calc_inf_inj_time(input_csv='WP2_multi_sc_catalog - WP2_multi_sc_event_list_
         else:
             onset_e100 = dt.datetime.strptime(f'{onset_date_e100_str} {onset_time_e100_str}', '%Y-%m-%d %H:%M:%S')
 
-        if not type(onset_p) is pd._libs.tslibs.nattype.NaTType:
+        if type(onset_p) is not pd._libs.tslibs.nattype.NaTType:
             sw_p = get_sw_speed(body=mission_p, dtime=onset_p, trange=1, default_vsw=0)
             if not np.isnan(sw_p) and not sw_p == 0:
                 sw_p = int(sw_p)
@@ -625,7 +636,7 @@ def calc_inf_inj_time(input_csv='WP2_multi_sc_catalog - WP2_multi_sc_event_list_
         else:
             inj_time_p = pd.NaT
             distance_p = np.nan
-        if not type(onset_e100) is pd._libs.tslibs.nattype.NaTType:
+        if type(onset_e100) is not pd._libs.tslibs.nattype.NaTType:
             sw_e100 = get_sw_speed(body=mission_e100, dtime=onset_e100, trange=1, default_vsw=0)
             if not np.isnan(sw_e100) and not sw_e100 == 0:
                 sw_e100 = int(sw_e100)
@@ -639,7 +650,7 @@ def calc_inf_inj_time(input_csv='WP2_multi_sc_catalog - WP2_multi_sc_event_list_
         else:
             inj_time_e100 = pd.NaT
             distance_e100 = np.nan
-        if not type(onset_e1000) is pd._libs.tslibs.nattype.NaTType:
+        if type(onset_e1000) is not pd._libs.tslibs.nattype.NaTType:
             sw_e1000 = get_sw_speed(body=mission_e1000, dtime=onset_e1000, trange=1, default_vsw=0)
             if not np.isnan(sw_e1000) and not sw_e1000 == 0:
                 sw_e1000 = int(sw_e1000)
@@ -654,7 +665,7 @@ def calc_inf_inj_time(input_csv='WP2_multi_sc_catalog - WP2_multi_sc_event_list_
         # print('')
         # print(i, mission, onset_p, onset_e1000, onset_e100, sw_p, sw_e1000, sw_e100)
 
-        if not type(inj_time_p) is pd._libs.tslibs.nattype.NaTType:
+        if type(inj_time_p) is not pd._libs.tslibs.nattype.NaTType:
             # df['p25MeV inferred injection time (HH:MM:SS)'].iloc[i] = inj_time_p.strftime('%H:%M:%S')
             # df['p25MeV inferred injection date (yyyy-mm-dd)'].iloc[i] = inj_time_p.strftime('%Y-%m-%d')
             # df['p25MeV pathlength used for inferred injection time (au)'].iloc[i] = np.round(distance_p.value, 2)
@@ -664,7 +675,7 @@ def calc_inf_inj_time(input_csv='WP2_multi_sc_catalog - WP2_multi_sc_event_list_
                 df.loc[i, 'p25MeV inferred injection time (HH:MM:SS)'] = inj_time_p.strftime('%H:%M:%S')
             df.loc[i, 'p25MeV inferred injection date (yyyy-mm-dd)'] = inj_time_p.strftime('%Y-%m-%d')
             df.loc[i, 'p25MeV pathlength used for inferred injection time (au)'] = np.round(distance_p.value, 2)
-        if not type(inj_time_e1000) is pd._libs.tslibs.nattype.NaTType:
+        if type(inj_time_e1000) is not pd._libs.tslibs.nattype.NaTType:
             # df['e1MeV inferred injection time (HH:MM:SS)'].iloc[i] = inj_time_e1000.strftime('%H:%M:%S')
             # df['e1MeV inferred injection date (yyyy-mm-dd)'].iloc[i] = inj_time_e1000.strftime('%Y-%m-%d')
             # df['e1MeV pathlength used for inferred injection time (au)'].iloc[i] = np.round(distance_e1000.value, 2)
@@ -674,7 +685,7 @@ def calc_inf_inj_time(input_csv='WP2_multi_sc_catalog - WP2_multi_sc_event_list_
                 df.loc[i, 'e1MeV inferred injection time (HH:MM:SS)'] = inj_time_e1000.strftime('%H:%M:%S')
             df.loc[i, 'e1MeV inferred injection date (yyyy-mm-dd)'] = inj_time_e1000.strftime('%Y-%m-%d')
             df.loc[i, 'e1MeV pathlength used for inferred injection time (au)'] = np.round(distance_e1000.value, 2)
-        if not type(inj_time_e100) is pd._libs.tslibs.nattype.NaTType:
+        if type(inj_time_e100) is not pd._libs.tslibs.nattype.NaTType:
             # df['e100keV inferred injection time (HH:MM:SS)'].iloc[i] = inj_time_e100.strftime('%H:%M:%S')
             # df['e100keV inferred injection date (yyyy-mm-dd)'].iloc[i] = inj_time_e100.strftime('%Y-%m-%d')
             # df['e100keV pathlength used for inferred injection time (au)'].iloc[i] = np.round(distance_e100.value, 2)
@@ -692,7 +703,7 @@ def calc_inf_inj_time(input_csv='WP2_multi_sc_catalog - WP2_multi_sc_event_list_
     return df
 
 
-def get_sc_coords(input_csv='WP2_multi_sc_catalog - WP2_multi_sc_event_list_draft.csv', output_csv=False):
+def get_sc_coords(input_csv='WP2_multi_sc_catalog - WP2_multi_sc_event_list_draft.csv', output_csv=False, datetime_source='Solar-MACH link'):
     """
     Obtains spacecraft coordinates for datetime defined in Solar-MACH link.
 
@@ -702,6 +713,8 @@ def get_sc_coords(input_csv='WP2_multi_sc_catalog - WP2_multi_sc_event_list_draf
         File name of csv file to read in. If not a full path, file is expected in the working directory.
     output_csv : boolean or string (optional)
         File name of new csv file to save. If not a full path, file is saved in the working directory.
+    datetime_source : string
+        Source of datetime for which the coordinates are obtained. Either the 'Solar-MACH link' (default) or the "Event start date" (for a fixed time of 12:00)
 
     Returns
     -------
@@ -712,36 +725,48 @@ def get_sc_coords(input_csv='WP2_multi_sc_catalog - WP2_multi_sc_event_list_draf
     -------
     df = get_sc_coords(output_csv='new_sc_coords.csv')
     """
+    import logging
+    import sunpy
+    ori_level = sunpy.log.level
+    sunpy.log.setLevel(logging.WARNING)
+
     df = pd.read_csv(input_csv)
     # loop over all rows:
-    for row in range(len(df)):
+    for row in tqdm(range(len(df))):
         ds = df.loc[row]  # get pd.Series of single row
         # only execute if ALL S/C coords are nan (i.e., empty):
         # if np.all([np.isnan(ds['S/C distance (au)']), np.isnan(ds['S/C Carrington longitude (deg)']), np.isnan(ds['S/C Carrington latitude (deg)'])]):
-        print(row)
-        if type(ds['Solar-MACH link']) is str:
-            for n in ds['Solar-MACH link'].split('&'):
-                if n.startswith('date='):
-                    date = n.split('=')[-1]  # %Y%m%d
-                if n.startswith('time='):
-                    time = n.split('=')[-1]  # %H%M
-            datetime = dt.datetime.strptime(date + time, '%Y%m%d%H%M')
-            # use L1 coords for SOHO/Wind:
-            if ds['Observer'] == 'L1 (SOHO/Wind)':
-                sc_coords = get_horizons_coord('SEMB-L1', datetime, None)
-            else:
-                sc_coords = get_horizons_coord(ds['Observer'], datetime, None)
+        # print(row)
+        if datetime_source == 'Solar-MACH link':
+            if type(ds['Solar-MACH link']) is str:
+                for n in ds['Solar-MACH link'].split('&'):
+                    if n.startswith('date='):
+                        date = n.split('=')[-1]  # %Y%m%d
+                    if n.startswith('time='):
+                        time = n.split('=')[-1]  # %H%M
+        elif datetime_source == "Event start date":
+            date = ds['Event start date (yyyy-mm-dd)'].replace('-', '')
+            time = "1200"
+            
+        datetime = dt.datetime.strptime(date + time, '%Y%m%d%H%M')
+        # print(datetime)
+        # use L1 coords for SOHO/Wind:
+        if ds['Observer'] == 'L1 (SOHO/Wind)':
+            sc_coords = get_horizons_coord('SEMB-L1', datetime, None)
+        else:
+            sc_coords = get_horizons_coord(ds['Observer'], datetime, None)
 
-            # convert from Stonyhurst to Carrington and obtain individual coords:
-            sc_coords = sc_coords.transform_to(frames.HeliographicCarrington(observer='Sun'))
-            df.loc[row, 'S/C distance (au)'] = np.round(sc_coords.radius.value, 2)
-            df.loc[row, 'S/C Carrington longitude (deg)'] = np.round(sc_coords.lon.value, 0).astype(int)
-            df.loc[row, 'S/C Carrington latitude (deg)'] = np.round(sc_coords.lat.value, 0).astype(int)
+        # convert from Stonyhurst to Carrington and obtain individual coords:
+        sc_coords = sc_coords.transform_to(frames.HeliographicCarrington(observer='Sun'))
+        df.loc[row, 'S/C distance (au)'] = np.round(sc_coords.radius.value, 2)
+        df.loc[row, 'S/C Carrington longitude (deg)'] = np.round(sc_coords.lon.value, 0).astype(int)
+        df.loc[row, 'S/C Carrington latitude (deg)'] = np.round(sc_coords.lat.value, 0).astype(int)
     df['S/C Carrington longitude (deg)'] = df['S/C Carrington longitude (deg)'].astype(pd.Int64Dtype())
     df['S/C Carrington latitude (deg)'] = df['S/C Carrington latitude (deg)'].astype(pd.Int64Dtype())
     if output_csv:
         df.to_csv(output_csv, index=False)
         print('Note that the format of some columns might have changed in the new csv file! To avoid this copy only the new columns from it, and paste them into your original spreadsheet.')
+    sunpy.log.setLevel(ori_level)
     return df
 
 
@@ -918,6 +943,8 @@ for i in tqdm(range(0, len(dates))):  # standard
     outfile = f'{outpath}{os.sep}multi_sc_plot_{startdate.date()}_{plot_period}_{averaging}-av.png'
     if mode == 'events':
         outfile = f'{outpath}{os.sep}multi_sc_plot_{startdate.date()}_{plot_period}_{averaging}-av_{i}.png'
+        if onset == 'pyonset':
+            outfile = outfile.replace('.png', '_pyonset.png')
     if lower_proton:
         outfile = f'{outpath}{os.sep}multi_sc_plot_{startdate.date()}_{plot_period}_{averaging}-av_p-mod.png'
 
@@ -1360,7 +1387,7 @@ for i in tqdm(range(0, len(dates))):  # standard
                         # label='PSP '+r"$\bf{(count\ rate\ *100)}$"+'\nISOIS-EPILO '+psp_epilo_chstring_e+f'\nF (W{psp_epilo_viewing})',
                         label=f'PSP ISOIS-EPILO F (W{psp_epilo_viewing})\n'+psp_epilo_chstring_e+r" $\bf{(count\ rate\ *100)}$",
                         drawstyle='steps-mid')
-            if plot_times:
+            if plot_times != 'None':
                 [ax.axvline(i, lw=vlw, color=psp_het_color) for i in df_psp_onset_e100]
                 [ax.axvline(i, lw=vlw, ls=':', color=psp_het_color) for i in df_psp_peak_e100]
 
@@ -1368,21 +1395,22 @@ for i in tqdm(range(0, len(dates))):  # standard
             # ax.plot(sixs_e.index, sixs_e[sixs_ch_e], color='orange', linewidth=linewidth, label='BepiColombo\nSIXS '+sixs_chstrings[sixs_ch_e]+f'\nside {sixs_side_e}', drawstyle='steps-mid')
             if len(sixs_df) > 0:
                 ax.plot(sixs_df_e100.index, sixs_df_e100, color=sixs_color, linewidth=linewidth, label=f'BepiColombo/SIXS side {sixs_side} '+sixs_e100_en_channel_string, drawstyle='steps-mid')
-            if plot_times:
+            if plot_times != 'None':
                 [ax.axvline(i, lw=vlw, color=sixs_color) for i in df_bepi_onset_e100]
                 [ax.axvline(i, lw=vlw, ls=':', color=sixs_color) for i in df_bepi_peak_e100]
 
         if SOLO:
             if ept and (len(ept_e) > 0):
                 flux_ept = df_ept_e.values
-                try:
-                    for ch in ept_ch_e100:
-                        ax.plot(df_ept_e.index.values, flux_ept[:, ch], linewidth=linewidth, color=solo_ept_color, label='SOLO\nEPT '+ept_en_str_e[ch, 0]+f'\n{sector}', drawstyle='steps-mid')
-                except IndexError:
-                    ax.plot(df_ept_e.index.values, flux_ept, linewidth=linewidth, color=solo_ept_color, label=f'SOLO/EPT {sector} '+ept_chstring_e, drawstyle='steps-mid')
                 if ept_use_corr_e:
-                    ax.plot(df_ept_e_corr.index.values, df_ept_e_corr.values, linewidth=linewidth, ls='dashdot', color='magenta', label=f'SOLO/EPT {sector} '+ept_chstring_e+'\n(corrected)', drawstyle='steps-mid')  
-            if plot_times:
+                    ax.plot(df_ept_e_corr.index.values, df_ept_e_corr.values, linewidth=linewidth, color=solo_ept_color, label=f'SOLO/EPT {sector} '+ept_chstring_e+'\n(corrected)', drawstyle='steps-mid')
+                else:
+                    try:
+                        for ch in ept_ch_e100:
+                            ax.plot(df_ept_e.index.values, flux_ept[:, ch], linewidth=linewidth, color=solo_ept_color, label='SOLO\nEPT '+ept_en_str_e[ch, 0]+f'\n{sector}', drawstyle='steps-mid')
+                    except IndexError:
+                        ax.plot(df_ept_e.index.values, flux_ept, linewidth=linewidth, color=solo_ept_color, label=f'SOLO/EPT {sector} '+ept_chstring_e, drawstyle='steps-mid')  
+            if plot_times != 'None':
                 [ax.axvline(i, lw=vlw, color=solo_ept_color) for i in df_solo_onset_e100]
                 [ax.axvline(i, lw=vlw, ls=':', color=solo_ept_color) for i in df_solo_peak_e100]
         if STEREO:
@@ -1393,7 +1421,7 @@ for i in tqdm(range(0, len(dates))):  # standard
                 elif type(sept_ch_e) is int:
                     ax.plot(sta_sept_df_e.index, sta_sept_df_e[f'ch_{sept_ch_e}'], color=stereo_sept_color,
                             linewidth=linewidth, label=f'STEREO-A/SEPT {sector} '+sta_sept_dict_e.loc[sept_ch_e]['ch_strings'], drawstyle='steps-mid')
-                if plot_times:
+                if plot_times != 'None':
                     [ax.axvline(i, lw=vlw, color=stereo_sept_color) for i in df_sta_onset_e100]
                     [ax.axvline(i, lw=vlw, ls=':', color=stereo_sept_color) for i in df_sta_peak_e100]
 
@@ -1406,7 +1434,7 @@ for i in tqdm(range(0, len(dates))):  # standard
             if len(wind3dp_e_df) > 0:
                 # multiply by 1e6 to get per MeV
                 ax.plot(wind3dp_e_df.index, wind3dp_e_df[f'FLUX_{wind3dp_ch_e}']*1e6, color=wind_color, linewidth=linewidth, label='Wind/3DP omni '+wind3dp_e_meta['channels_dict_df']['Bins_Text'].iloc[wind3dp_ch_e], drawstyle='steps-mid')
-            if plot_times:
+            if plot_times != 'None':
                 [ax.axvline(i, lw=vlw, color=wind_color) for i in df_wind_onset_e100]
                 [ax.axvline(i, lw=vlw, ls=':', color=wind_color) for i in df_wind_peak_e100]
 
@@ -1494,7 +1522,7 @@ for i in tqdm(range(0, len(dates))):  # standard
                         # label='PSP '+r"$\bf{(count\ rate\ *10)}$"+'\nISOIS-EPIHI-HET '+psp_het_chstring_e+'\nA (sun)',
                         label='PSP ISOIS-EPIHI-HET A (sun)\n'+psp_het_chstring_e+r" $\bf{(count\ rate\ *10)}$",
                         drawstyle='steps-mid')
-            if plot_times:
+            if plot_times != 'None':
                 [ax.axvline(i, lw=vlw, color=psp_het_color) for i in df_psp_onset_e1000]
                 [ax.axvline(i, lw=vlw, ls=':', color=psp_het_color) for i in df_psp_peak_e1000]
         if Bepi:
@@ -1503,13 +1531,13 @@ for i in tqdm(range(0, len(dates))):  # standard
             if len(sixs_df) > 0:
                 ax.plot(sixs_df_e1.index, sixs_df_e1, color=sixs_color, linewidth=linewidth,
                         label=f'BepiColombo/SIXS side {sixs_side} '+sixs_e1_en_channel_string, drawstyle='steps-mid')
-            if plot_times:
+            if plot_times != 'None':
                 [ax.axvline(i, lw=vlw, color=sixs_color) for i in df_bepi_onset_e1000]
                 [ax.axvline(i, lw=vlw, ls=':', color=sixs_color) for i in df_bepi_peak_e1000]
         if SOLO:
             if het and (len(het_e) > 0):
                 ax.plot(df_het_e.index.values, df_het_e.flux, linewidth=linewidth, color=solo_het_color, label=f'SOLO/HET {sector} '+het_chstring_e+'', drawstyle='steps-mid')
-            if plot_times:
+            if plot_times != 'None':
                 [ax.axvline(i, lw=vlw, color=solo_het_color) for i in df_solo_onset_e1000]
                 [ax.axvline(i, lw=vlw, ls=':', color=solo_het_color) for i in df_solo_peak_e1000]
         if STEREO:
@@ -1517,7 +1545,7 @@ for i in tqdm(range(0, len(dates))):  # standard
                 if len(sta_het_avg_e) > 0:
                     ax.plot(sta_het_avg_e.index, sta_het_avg_e, color=stereo_het_color, linewidth=linewidth,
                             label='STEREO-A/HET '+st_het_chstring_e, drawstyle='steps-mid')
-            if plot_times:
+            if plot_times != 'None':
                 [ax.axvline(i, lw=vlw, color=stereo_het_color) for i in df_sta_onset_e1000]
                 [ax.axvline(i, lw=vlw, ls=':', color=stereo_het_color) for i in df_sta_peak_e1000]
         if SOHO:
@@ -1525,7 +1553,7 @@ for i in tqdm(range(0, len(dates))):  # standard
                 # ax.plot(ephin['date'], ephin[ephin_ch_e][0]*ephin_e_intercal, color=soho_ephin_color, linewidth=linewidth, label='SOHO/EPHIN '+ephin[ephin_ch_e][1]+f'/{ephin_e_intercal}', drawstyle='steps-mid')
                 if len(soho_ephin) > 0:
                     ax.plot(soho_ephin.index, soho_ephin[ephin_ch_e1], color=soho_ephin_color, linewidth=linewidth, label='SOHO/EPHIN '+ephin_energies[ephin_ch_e1], drawstyle='steps-mid')
-            if plot_times:
+            if plot_times != 'None':
                 [ax.axvline(i, lw=vlw, color=soho_ephin_color) for i in df_soho_onset_e1000]
                 [ax.axvline(i, lw=vlw, ls=':', color=soho_ephin_color) for i in df_soho_peak_e1000]
 
@@ -1557,20 +1585,20 @@ for i in tqdm(range(0, len(dates))):  # standard
                         # label='PSP '+'\nISOIS-EPIHI-HET '+psp_het_chstring_p+'\nA (sun)',
                         label='PSP ISOIS-EPIHI-HET A (sun)\n'+psp_het_chstring_p,
                         drawstyle='steps-mid')
-            if plot_times:
+            if plot_times != 'None':
                 [ax.axvline(i, lw=vlw, color=psp_het_color) for i in df_psp_onset_p]
                 [ax.axvline(i, lw=vlw, ls=':', color=psp_het_color) for i in df_psp_peak_p]
         if Bepi:
             # ax.plot(sixs_p.index, sixs_p[sixs_ch_p], color='orange', linewidth=linewidth, label='BepiColombo/SIXS '+sixs_chstrings[sixs_ch_p]+f' side {sixs_side_p}', drawstyle='steps-mid')
             if len(sixs_df) > 0:
                 ax.plot(sixs_df_p25.index, sixs_df_p25, color=sixs_color, linewidth=linewidth, label=f'BepiColombo/SIXS side {sixs_side} '+sixs_p25_en_channel_string, drawstyle='steps-mid')
-            if plot_times:
+            if plot_times != 'None':
                 [ax.axvline(i, lw=vlw, color=sixs_color) for i in df_bepi_onset_p]
                 [ax.axvline(i, lw=vlw, ls=':', color=sixs_color) for i in df_bepi_peak_p]
         if SOLO:
             if het and (len(het_p) > 0):
                 ax.plot(df_het_p.index, df_het_p, linewidth=linewidth, color=solo_het_color, label=f'SOLO/HET {sector} '+het_chstring_p, drawstyle='steps-mid')
-            if plot_times:
+            if plot_times != 'None':
                 [ax.axvline(i, lw=vlw, color=solo_het_color) for i in df_solo_onset_p]
                 [ax.axvline(i, lw=vlw, ls=':', color=solo_het_color) for i in df_solo_peak_p]
         if STEREO:
@@ -1586,7 +1614,7 @@ for i in tqdm(range(0, len(dates))):  # standard
             if let:
                 str_ch = {0: 'P1', 1: 'P2', 2: 'P3', 3: 'P4'}
                 ax.plot(sta_let_df.index, sta_let_df[f'H_unsec_flux_{let_ch}'], color=stereo_let_color, linewidth=linewidth, label='STERE/LET '+let_chstring[let_ch], drawstyle='steps-mid')
-            if plot_times:
+            if plot_times != 'None':
                 [ax.axvline(i, lw=vlw, color=stereo_het_color) for i in df_sta_onset_p]
                 [ax.axvline(i, lw=vlw, ls=':', color=stereo_het_color) for i in df_sta_peak_p]
         if SOHO:
@@ -1598,7 +1626,7 @@ for i in tqdm(range(0, len(dates))):  # standard
                         ax.plot(soho_erne.index, soho_erne[f'PH_{erne_p_ch}'], color=soho_erne_color, linewidth=linewidth, label='SOHO/ERNE/HED '+erne_chstring[erne_p_ch], drawstyle='steps-mid')
             # if ephin_p:
             #     ax.plot(ephin['date'], ephin[ephin_ch_p][0], color=soho_ephin_color, linewidth=linewidth, label='SOHO/EPHIN '+ephin[ephin_ch_p][1], drawstyle='steps-mid')
-            if plot_times:
+            if plot_times != 'None':
                 [ax.axvline(i, lw=vlw, color=soho_erne_color) for i in df_soho_onset_p]
                 [ax.axvline(i, lw=vlw, ls=':', color=soho_erne_color) for i in df_soho_peak_p]
         # if WIND:
