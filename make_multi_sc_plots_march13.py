@@ -557,7 +557,7 @@ if plot_p:
 if plot_p_maven:
     panels = panels + 1
 # fig, axes = plt.subplots(panels, figsize=(24, 15), dpi=200, sharex=True)
-fig, axes = plt.subplots(panels, figsize=(20, 13), dpi=200, sharex=True)
+fig, axes = plt.subplots(panels, figsize=(20, 14), dpi=200, sharex=True)
 axnum = 0
 # Intensities
 ####################################################################
@@ -683,7 +683,7 @@ if plot_p:
         if len(sixs_df) > 0:
             ax.plot(sixs_df_p25.index, sixs_df_p25, color=sixs_color, linewidth=linewidth, label='BepiColombo\nSIXS '+sixs_p25_en_channel_string+f'\nside {sixs_side}', drawstyle='steps-mid')
     if Maven:
-        ax.plot(pd.to_datetime(maven_p_new_1.index, format=maven_time_format), maven_p_new_1[f'E{maven_ch_p_new_1}'], color=maven_color, linewidth=linewidth, label=f'MAVEN {maven_p_channels_new_1[maven_ch_p_new_1]}', drawstyle='steps-mid')
+        ax.plot(pd.to_datetime(maven_p_new_1.index, format=maven_time_format), 0.01*maven_p_new_1[f'E{maven_ch_p_new_1}'], color=maven_color, linewidth=linewidth, label=f'MAVEN {maven_p_channels_new_1[maven_ch_p_new_1]}\n'+r"$\bf{(Flux\ *\ 0.01)}$", drawstyle='steps-mid')
     if SOLO:
         if het and (len(het_p) > 0):
             ax.plot(df_het_p.index, df_het_p, linewidth=linewidth, color=solo_het_color, label='SOLO\nHET '+het_chstring_p.replace('00 ', ' ')+f'\n{sector}', drawstyle='steps-mid')
