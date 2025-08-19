@@ -1210,17 +1210,20 @@ for i in tqdm(range(0, len(dates))):  # standard
                 if isinstance(solo_ept_resample, str):
                     df_ept_conta_p = resample_df(df_ept_conta_p, solo_ept_resample)
 
-        if len(het_e) > 0:
-            if plot_e_1:
-                print('calc_av_en_flux_HET e')
-                df_het_e, het_chstring_e = calc_av_en_flux_EPD(het_e, het_energies, het_ch_e1, 'het')
-                if isinstance(solo_het_resample, str):
-                    df_het_e = resample_df(df_het_e, solo_het_resample)
-            if plot_p:
-                print('calc_av_en_flux_HET p')
-                df_het_p, het_chstring_p = calc_av_en_flux_EPD(het_p, het_energies, het_ch_p, 'het')
-                if isinstance(solo_het_resample, str):
-                    df_het_p = resample_df(df_het_p, solo_het_resample)
+        try:
+            if len(het_e) > 0 or len(het_p) > 0:
+                if plot_e_1:
+                    print('calc_av_en_flux_HET e')
+                    df_het_e, het_chstring_e = calc_av_en_flux_EPD(het_e, het_energies, het_ch_e1, 'het')
+                    if isinstance(solo_het_resample, str):
+                        df_het_e = resample_df(df_het_e, solo_het_resample)
+                if plot_p:
+                    print('calc_av_en_flux_HET p')
+                    df_het_p, het_chstring_p = calc_av_en_flux_EPD(het_p, het_energies, het_ch_p, 'het')
+                    if isinstance(solo_het_resample, str):
+                        df_het_p = resample_df(df_het_p, solo_het_resample)
+        except NameError:
+            pass
 
     if STEREO:
         if sept_e:
@@ -1650,9 +1653,10 @@ for i in tqdm(range(0, len(dates))):  # standard
     # fig.suptitle(f'Solar Orbiter/EPD {sector} (R={dist} au)')
     ax.set_xlim(startdate, enddate)
     # ax.set_xlim(dt.datetime(2021, 10, 9, 6, 0), dt.datetime(2021, 10, 9, 11, 0))
-    ax.xaxis.set_major_formatter(mdates.DateFormatter('%m-%d\n%H:%M'))
+    # ax.xaxis.set_major_formatter(mdates.DateFormatter('%m-%d\n%H:%M'))
+    ax.xaxis.set_major_formatter(mdates.DateFormatter('%H:%M\n%b %d'))  # -d linux, #d windows
     ax.xaxis.set_minor_locator(AutoMinorLocator(2))
-    ax.set_xlabel('Date / Time in year '+str(startdate.year))
+    ax.set_xlabel(f"Time (UTC) / Date in {startdate.year}")
     plt.tight_layout()
     fig.subplots_adjust(hspace=0.1)
     if save_fig:
