@@ -9,6 +9,7 @@ import pandas as pd
 import sunpy
 from matplotlib.ticker import AutoMinorLocator
 from matplotlib.transforms import blended_transform_factory
+from seppy.loader.juice import juice_radem_load
 from seppy.loader.psp import (calc_av_en_flux_PSP_EPIHI,
                               calc_av_en_flux_PSP_EPILO, psp_isois_load,
                               resample_df)
@@ -27,7 +28,7 @@ from tqdm import tqdm
 #############################################################
 
 # processing mode: 'regular' (e.g. weekly) or 'events'
-mode = 'events'
+mode = 'regular'
 
 # if mode='events', which onset to use: 'classic' or 'pyonset'
 onset = 'classic'
@@ -54,8 +55,8 @@ else:
     add_bepi_conta_ch = False  # True if contaminaiting Bepi/SIXS ion channel (XXX) should be added to the 100 keV electron panel
 
 if mode == 'regular':
-    first_date = dt.datetime(2025, 3, 25)
-    last_date = dt.datetime(2025, 7, 31)
+    first_date = dt.datetime(2024, 5, 7)
+    last_date = dt.datetime(2024, 5, 7)
     plot_period = '7D'
     averaging = '1h'  # '5min'  # None
 
@@ -63,6 +64,7 @@ if mode == 'events':
     averaging = '20min'  # '5min' None
 
 Bepi = True
+JUICE = True
 PSP = True
 SOHO = True
 SOLO = True
@@ -960,6 +962,13 @@ for i in tqdm(range(0, len(dates))):  # standard
         sixs_color = 'orange'  # seaborn_colorblind[4]  # orange?
         # sixs_path = '/home/gieseler/uni/bepi/data/bc_mpo_sixs/data_csv/cruise/sixs-p/raw'
         sixs_path = '/Users/jagies/data/bepi/bc_mpo_sixs/data_csv/cruise/sixs-p/raw'
+
+    if JUICE:
+        juice_resample = averaging  # '10min'
+        juice_ch_p = 4
+        juice_color = 'pink'  # seaborn_colorblind[4]  # orange?
+        juice_path = '/Users/jagies/data/juice'
+
     if SOHO:
         soho_ephin_color = 'k'
         soho_erne_color = 'k'  # seaborn_colorblind[5]  # 'green'
@@ -1159,6 +1168,10 @@ for i in tqdm(range(0, len(dates))):  # standard
         if len(sixs_df) > 0:
             sixs_df_p = sixs_df[[f"P{i}" for i in range(1, 10)]]
             sixs_df_e = sixs_df[[f"E{i}" for i in range(1, 8)]]
+
+    if JUICE:
+        print('loading JUICE/RADEM')
+        juice_radem_df, juice_radem_energies, juice_radem_meta = juice_radem_load(startdate=startdate, enddate=enddate, resample=juice_resample, path=juice_path)
 
     """
     ########## AVERAGE ENERGY CHANNELS ##########
@@ -1598,6 +1611,11 @@ for i in tqdm(range(0, len(dates))):  # standard
             if plot_times != 'None':
                 [ax.axvline(i, lw=vlw, color=sixs_color) for i in df_bepi_onset_p]
                 [ax.axvline(i, lw=vlw, ls=':', color=sixs_color) for i in df_bepi_peak_p]
+
+        if JUICE:
+            if len(juice_radem_df) > 0:
+                ax.plot(juice_radem_df.index, juice_radem_df[f'PROTONS_{juice_ch_p}']/juice_radem_df['INTEGRATION_TIME'], color=juice_color, linewidth=linewidth, label=f'JUICE/RADEM P{juice_ch_p}'+r" $\bf{(count\ rate)}$", drawstyle='steps-mid')
+
         if SOLO:
             if het and (len(het_p) > 0):
                 ax.plot(df_het_p.index, df_het_p, linewidth=linewidth, color=solo_het_color, label=f'SOLO/HET {sector} '+het_chstring_p, drawstyle='steps-mid')
