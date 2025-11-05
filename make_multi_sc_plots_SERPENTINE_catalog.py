@@ -55,8 +55,8 @@ else:
     add_bepi_conta_ch = False  # True if contaminaiting Bepi/SIXS ion channel (XXX) should be added to the 100 keV electron panel
 
 if mode == 'regular':
-    first_date = dt.datetime(2024, 5, 7)
-    last_date = dt.datetime(2024, 5, 7)
+    first_date = dt.datetime(2025, 4, 8)
+    last_date = dt.datetime(2025, 7, 31)
     plot_period = '7D'
     averaging = '1h'  # '5min'  # None
 
@@ -1592,6 +1592,19 @@ for i in tqdm(range(0, len(dates))):  # standard
             ax = axes
         else:
             ax = axes[axnum]
+
+        if Bepi:
+            # ax.plot(sixs_p.index, sixs_p[sixs_ch_p], color='orange', linewidth=linewidth, label='BepiColombo/SIXS '+sixs_chstrings[sixs_ch_p]+f' side {sixs_side_p}', drawstyle='steps-mid')
+            if len(sixs_df) > 0:
+                ax.plot(sixs_df_p25.index, sixs_df_p25, color=sixs_color, linewidth=linewidth, label=f'BepiColombo/SIXS side {sixs_side} '+sixs_p25_en_channel_string, drawstyle='steps-mid')
+            if plot_times != 'None':
+                [ax.axvline(i, lw=vlw, color=sixs_color) for i in df_bepi_onset_p]
+                [ax.axvline(i, lw=vlw, ls=':', color=sixs_color) for i in df_bepi_peak_p]
+
+        if JUICE:
+            if len(juice_radem_df) > 0:
+                ax.plot(juice_radem_df.index, juice_radem_df[f'PROTONS_{juice_ch_p}']/juice_radem_df['INTEGRATION_TIME']/1000, color=juice_color, linewidth=linewidth, label=f'JUICE/RADEM P{juice_ch_p}'+r" $\bf{(count\ rate/1000)}$", drawstyle='steps-mid')
+
         if PSP:
             if len(psp_het) > 0:
                 # ax.plot(psp_het.index, psp_het[f'A_H_Flux_{psp_het_ch_p}'], color=psp_het_color, linewidth=linewidth,
@@ -1604,17 +1617,6 @@ for i in tqdm(range(0, len(dates))):  # standard
             if plot_times != 'None':
                 [ax.axvline(i, lw=vlw, color=psp_het_color) for i in df_psp_onset_p]
                 [ax.axvline(i, lw=vlw, ls=':', color=psp_het_color) for i in df_psp_peak_p]
-        if Bepi:
-            # ax.plot(sixs_p.index, sixs_p[sixs_ch_p], color='orange', linewidth=linewidth, label='BepiColombo/SIXS '+sixs_chstrings[sixs_ch_p]+f' side {sixs_side_p}', drawstyle='steps-mid')
-            if len(sixs_df) > 0:
-                ax.plot(sixs_df_p25.index, sixs_df_p25, color=sixs_color, linewidth=linewidth, label=f'BepiColombo/SIXS side {sixs_side} '+sixs_p25_en_channel_string, drawstyle='steps-mid')
-            if plot_times != 'None':
-                [ax.axvline(i, lw=vlw, color=sixs_color) for i in df_bepi_onset_p]
-                [ax.axvline(i, lw=vlw, ls=':', color=sixs_color) for i in df_bepi_peak_p]
-
-        if JUICE:
-            if len(juice_radem_df) > 0:
-                ax.plot(juice_radem_df.index, juice_radem_df[f'PROTONS_{juice_ch_p}']/juice_radem_df['INTEGRATION_TIME'], color=juice_color, linewidth=linewidth, label=f'JUICE/RADEM P{juice_ch_p}'+r" $\bf{(count\ rate)}$", drawstyle='steps-mid')
 
         if SOLO:
             if het and (len(het_p) > 0):
