@@ -28,11 +28,11 @@ from tqdm import tqdm
 #############################################################
 
 # processing mode: 'regular' (e.g. weekly) or 'events'
-mode = 'regular'
+mode = 'events'
 
 # if mode='events', which onset to use: 'classic' or 'pyonset'
-onset = 'classic'
-# onset = 'pyonset'
+# onset_times = 'classic'
+onset_times = 'pyonset'
 
 lower_proton = False  # True if 13 MeV protons should be used instead of 25+ MeV
 add_contaminating_channels = False
@@ -64,10 +64,10 @@ if mode == 'events':
     averaging = '20min'  # '5min' None
 
 Bepi = True
-JUICE = True
+JUICE = False # TODO: set to True when JUICE/RADEM is back online
 PSP = True
 SOHO = True
-SOLO = True
+SOLO = False  # TODO: set to True when SOAR is back online
 STEREO = True
 WIND = True
 
@@ -95,7 +95,7 @@ wind3dp_e = True
 if mode == 'regular':
     plot_times = 'None'
 if mode == 'events':
-    plot_times = onset
+    plot_times = onset_times
 
 #############################################################
 
@@ -349,7 +349,9 @@ if plot_times != 'None':
     if plot_times == 'classic':
         df = pd.read_csv('WP2_multi_sc_catalog - WP2_multi_sc_event_list_draft.csv')
     elif plot_times == 'pyonset':
-        df = pd.read_csv('SERPENTINE_SEP_catalog_PyOnset - WP2_multi_sc_event_list_draft.csv')
+        # df = pd.read_csv('SERPENTINE_SEP_catalog_PyOnset - WP2_multi_sc_event_list_draft.csv')
+    # elif plot_times == 'soler':
+        df = pd.read_csv('SOLER_SEP_catalog_PyOnset - WP2_multi_sc_event_list_draft.csv')
 
     # get list of flare times
     df_flare_date_str = df['flare date (yyyy-mm-dd)'].values.astype(str)
@@ -370,6 +372,17 @@ if plot_times != 'None':
             onset_string = 'PyOnset'
 
         df_solo = df[df.Observer == observer]
+
+        # sanity check
+        for particles in ['p25MeV', 'e100keV', 'e1MeV']:
+            for var in [onset_string, 'peak']:
+                mark = df_solo[f'{particles} {var} time (HH:MM:SS)'].isna() ^ df_solo[f'{particles} {var} date (yyyy-mm-dd)'].isna()
+                if mark.sum() > 0:
+                    print(f'For {observer} {particles}, {var} time is missing while {var} date is defined! ')
+                    print(df_solo[f'{particles} {var} date (yyyy-mm-dd)'][mark])
+                    print('')
+                    # raise ValueError(f'For {observer}, {var} time is missing while {var} date is defined! See above print out above error for dates.')
+                df_solo[f'{particles} {var} date (yyyy-mm-dd)'][mark] = np.nan
 
         # protons
         df_solo_onset_date_p_str = df_solo[f'p25MeV {onset_string} date (yyyy-mm-dd)'].values.astype(str)
@@ -430,12 +443,30 @@ if plot_times != 'None':
 
         return df_solo_onset_p, df_solo_peak_p, df_solo_onset_e100, df_solo_peak_e100, df_solo_onset_e1000, df_solo_peak_e1000
 
-    df_bepi_onset_p, df_bepi_peak_p, df_bepi_onset_e100, df_bepi_peak_e100, df_bepi_onset_e1000, df_bepi_peak_e1000 = get_times_from_csv_list(df, 'BepiColombo', onset=onset)
-    df_solo_onset_p, df_solo_peak_p, df_solo_onset_e100, df_solo_peak_e100, df_solo_onset_e1000, df_solo_peak_e1000 = get_times_from_csv_list(df, 'SOLO', onset=onset)
-    df_sta_onset_p, df_sta_peak_p, df_sta_onset_e100, df_sta_peak_e100, df_sta_onset_e1000, df_sta_peak_e1000 = get_times_from_csv_list(df, 'STEREO-A', onset=onset)
-    df_psp_onset_p, df_psp_peak_p, df_psp_onset_e100, df_psp_peak_e100, df_psp_onset_e1000, df_psp_peak_e1000 = get_times_from_csv_list(df, 'PSP', onset=onset)
-    df_wind_onset_p, df_wind_peak_p, df_wind_onset_e100, df_wind_peak_e100, df_wind_onset_e1000, df_wind_peak_e1000 = get_times_from_csv_list(df, 'L1 (SOHO/Wind)', onset=onset)  # previously 'Wind'
-    df_soho_onset_p, df_soho_peak_p, df_soho_onset_e100, df_soho_peak_e100, df_soho_onset_e1000, df_soho_peak_e1000 = get_times_from_csv_list(df, 'L1 (SOHO/Wind)', onset=onset)  # previously 'SOHO'
+    try:
+        df_bepi_onset_p, df_bepi_peak_p, df_bepi_onset_e100, df_bepi_peak_e100, df_bepi_onset_e1000, df_bepi_peak_e1000 = get_times_from_csv_list(df, 'BepiColombo', onset=onset_times)
+    except IndexError:
+        pass
+    try:
+        df_solo_onset_p, df_solo_peak_p, df_solo_onset_e100, df_solo_peak_e100, df_solo_onset_e1000, df_solo_peak_e1000 = get_times_from_csv_list(df, 'SOLO', onset=onset_times)
+    except IndexError:
+        pass
+    try:
+        df_sta_onset_p, df_sta_peak_p, df_sta_onset_e100, df_sta_peak_e100, df_sta_onset_e1000, df_sta_peak_e1000 = get_times_from_csv_list(df, 'STEREO-A', onset=onset_times)
+    except IndexError:
+        pass
+    try:
+        df_psp_onset_p, df_psp_peak_p, df_psp_onset_e100, df_psp_peak_e100, df_psp_onset_e1000, df_psp_peak_e1000 = get_times_from_csv_list(df, 'PSP', onset=onset_times)
+    except IndexError:
+        pass
+    try:
+        df_wind_onset_p, df_wind_peak_p, df_wind_onset_e100, df_wind_peak_e100, df_wind_onset_e1000, df_wind_peak_e1000 = get_times_from_csv_list(df, 'L1 (SOHO/Wind)', onset=onset_times)  # previously 'Wind'
+    except IndexError:
+        pass
+    try:
+        df_soho_onset_p, df_soho_peak_p, df_soho_onset_e100, df_soho_peak_e100, df_soho_onset_e1000, df_soho_peak_e1000 = get_times_from_csv_list(df, 'L1 (SOHO/Wind)', onset=onset_times)  # previously 'SOHO'
+    except IndexError:
+        pass
 
     # obtain a list of all onset datetime
     all_onsets = df_bepi_onset_p + df_bepi_onset_e100 + df_bepi_onset_e1000 + df_solo_onset_p + df_solo_onset_e100 + df_solo_onset_e1000 + df_sta_onset_p + df_sta_onset_e100 + df_sta_onset_e1000 + df_psp_onset_p + df_psp_onset_e100 + df_psp_onset_e1000 + df_wind_onset_p + df_wind_onset_e100 + df_wind_onset_e1000 + df_soho_onset_p + df_soho_onset_e100 + df_soho_onset_e1000
@@ -945,7 +976,7 @@ for i in tqdm(range(0, len(dates))):  # standard
     outfile = f'{outpath}{os.sep}multi_sc_plot_{startdate.date()}_{plot_period}_{averaging}-av.png'
     if mode == 'events':
         outfile = f'{outpath}{os.sep}multi_sc_plot_{startdate.date()}_{plot_period}_{averaging}-av_{i}.png'
-        if onset == 'pyonset':
+        if onset_times == 'pyonset':
             outfile = outfile.replace('.png', '_pyonset.png')
     if lower_proton:
         outfile = f'{outpath}{os.sep}multi_sc_plot_{startdate.date()}_{plot_period}_{averaging}-av_p-mod.png'
@@ -1568,7 +1599,7 @@ for i in tqdm(range(0, len(dates))):  # standard
             if ephin_e:
                 # ax.plot(ephin['date'], ephin[ephin_ch_e][0]*ephin_e_intercal, color=soho_ephin_color, linewidth=linewidth, label='SOHO/EPHIN '+ephin[ephin_ch_e][1]+f'/{ephin_e_intercal}', drawstyle='steps-mid')
                 if len(soho_ephin) > 0:
-                    ax.plot(soho_ephin.index, soho_ephin[ephin_ch_e1], color=soho_ephin_color, linewidth=linewidth, label='SOHO/EPHIN '+ephin_energies[ephin_ch_e1], drawstyle='steps-mid')
+                    ax.plot(soho_ephin.index, soho_ephin[ephin_ch_e1], color=soho_ephin_color, linewidth=linewidth, label='SOHO/EPHIN '+ephin_energies['energy_labels'][ephin_ch_e1], drawstyle='steps-mid')
             if plot_times != 'None':
                 [ax.axvline(i, lw=vlw, color=soho_ephin_color) for i in df_soho_onset_e1000]
                 [ax.axvline(i, lw=vlw, ls=':', color=soho_ephin_color) for i in df_soho_peak_e1000]
