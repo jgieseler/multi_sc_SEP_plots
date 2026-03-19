@@ -28,7 +28,7 @@ from tqdm import tqdm
 #############################################################
 
 # processing mode: 'regular' (e.g. weekly) or 'events'
-mode = 'events'
+mode = 'regular'
 
 # if mode='events', which onset to use: 'classic' or 'pyonset'
 # onset_times = 'classic'
@@ -55,8 +55,8 @@ else:
     add_bepi_conta_ch = False  # True if contaminaiting Bepi/SIXS ion channel (XXX) should be added to the 100 keV electron panel
 
 if mode == 'regular':
-    first_date = dt.datetime(2025, 4, 8)
-    last_date = dt.datetime(2025, 7, 31)
+    first_date = dt.datetime(2025, 6, 3)
+    last_date = dt.datetime(2025, 9, 30)
     plot_period = '7D'
     averaging = '1h'  # '5min'  # None
 
@@ -64,10 +64,10 @@ if mode == 'events':
     averaging = '20min'  # '5min' None
 
 Bepi = True
-JUICE = False # TODO: set to True when JUICE/RADEM is back online
+JUICE = True
 PSP = True
 SOHO = True
-SOLO = False  # TODO: set to True when SOAR is back online
+SOLO = True
 STEREO = True
 WIND = True
 
@@ -544,7 +544,278 @@ End Create event time list for SEPserver
 """
 
 
-def calc_inf_inj_time(input_csv='WP2_multi_sc_catalog - WP2_multi_sc_event_list_draft.csv', output_csv=False, sw=400, clean_df=True, round_minutes=True):
+def convert_psp_soler(input_csv='SOLER_SEP_catalog_PyOnset - WP2_multi_sc_event_list_draft.csv', output_csv=False, events='default', clean_df=True):
+    """
+    Convert PSP electron peak count rates to intensities in catalogue csv file.
+
+    Parameters
+    ----------
+    input_csv : string
+        File name of csv file to read in. If not a full path, file is expected in the working directory.
+    output_csv : boolean or string (optional)
+        File name of new csv file to save. If not a full path, file is saved in the working directory.
+    events : list of integers
+        List of event numbers (as in the csv file) to process. If empty list, no events are processed. 'default' processes defined set of events.
+    clean_df : Boolean
+        If True, initially delete columns that will be populate in this function; that is for each species XX:
+        - 'XX onset solar wind speed (km/s)'
+        - 'XX inferred injection time (HH:MM)'
+        - 'XX inferred injection date (yyyy-mm-dd)'
+        - 'XX pathlength used for inferred injection time (au)'
+
+    Returns
+    -------
+    df: pd.DataFrame
+        Updated DataFrame with obtained spacecraft coordinates
+
+    Example
+    -------
+    df = convert_psp_soler(events=[], output_csv='new_psp_intensities.csv')
+
+    Note
+    ----
+    Full function code should be copied to terminal, then executed there.
+    Afterwards, columns containing inferred injection times as well as solarwind
+    speeds have to be manually copied to the main spreadsheet!
+    """
+    df = pd.read_csv(input_csv)
+
+    if events == 'default':
+        events = [7, 20, 25, 31, 33, 34, 36, 37, 39, 40, 41, 43, 45, 48, 49, 50, 51, 52, 60, 62, *range(66, df['event number'].max()+1)]
+
+    if clean_df:
+        for spec in ['e100keV', 'e1MeV']:
+            for col in [f'{spec} peak flux proxy']:
+                try:
+                    # NOT dropping the column so that column order is unchanged. instead, overwrite all entries with ""
+                    # df.drop(labels=col, axis=1, inplace=True)
+                    df[col] = np.nan
+                except KeyError as err:
+                    print(err)
+
+    # conversion factors for PSP electron peak count rates to intensities
+    b_factors = {'e100keV': 3.52,
+                 'e1MeV': 1.70}
+
+    # for i in tqdm(range(df.shape[0])):
+    #     if df['event number'].iloc[i] in events and df['Observer'].iloc[i] in ['PSP']:
+    #         for spec in ['e100keV', 'e1MeV']:
+    #             df[f'{spec} peak flux proxy'].iloc[i] = df[f'{spec} peak flux'].iloc[i] * 10**b_factors[spec]
+    #             df[f'{spec} peak flux'].iloc[i] = ""
+    selection = (df['event number'].isin(events)) & (df['Observer'].isin(['PSP']))
+    for spec in ['e100keV', 'e1MeV']:
+        df.loc[selection, f'{spec} peak flux proxy'] = df.loc[selection, f'{spec} peak flux'] * 10**b_factors[spec]
+        # df.loc[selection, f'{spec} peak flux proxy'] = df.loc[selection, f'{spec} peak flux proxy'].apply(lambda x: '{:.2e}'.format(x))
+        df.loc[selection, f'{spec} peak flux'] = np.nan
+
+    if output_csv:
+        df.to_csv(output_csv, index=False)
+        print('')
+        print('Note that the format of some columns might have changed in the new csv file! To avoid this copy only the new columns from it, and paste them into your original spreadsheet.')
+    return df
+
+
+# df = calc_inf_inj_time_soler(output_csv='new_inf_inj_times.csv')
+# df = convert_psp_soler(input_csv='new_inf_inj_times.csv', output_csv='SOLER_SEP_catalogue.csv')
+
+
+def calc_inf_inj_time_soler(input_csv='SOLER_SEP_catalog_PyOnset - WP2_multi_sc_event_list_draft.csv', output_csv=False, sw=400, clean_df=True, round_minutes=True):
+    """
+    Calculates inferred injection times from catalogue csv file.
+
+    Parameters
+    ----------
+    input_csv : string
+        File name of csv file to read in. If not a full path, file is expected in the working directory.
+    output_csv : boolean or string (optional)
+        File name of new csv file to save. If not a full path, file is saved in the working directory.
+    sw : integer
+        Solar wind speed in km/s used for the calculation if automatically
+        obtaining measurements doesn't yield results.
+    clean_df : Boolean
+        If True, initially delete columns that will be populate in this function; that is for each species XX:
+        - 'XX onset solar wind speed (km/s)'
+        - 'XX inferred injection time (HH:MM)'
+        - 'XX inferred injection date (yyyy-mm-dd)'
+        - 'XX pathlength used for inferred injection time (au)'
+    round_minutes : Boolean
+        If True, round the inferred injection times to full minutes (e.g., 12:00:31 --> 12:01)
+
+    Returns
+    -------
+    df: pd.DataFrame
+        Updated DataFrame with obtained spacecraft coordinates
+
+    Example
+    -------
+    df = calc_inf_inj_time_soler(output_csv='new_inf_inj_times.csv')
+
+    Note
+    ----
+    Full function code should be copied to terminal, then executed there.
+    Afterwards, columns containing inferred injection times as well as solarwind
+    speeds have to be manually copied to the main spreadsheet!
+    """
+    from seppy.util import inf_inj_time, custom_warning
+    from solarmach import get_sw_speed
+    from sunpy import log
+    from tqdm import tqdm
+
+    # surpress the INFO message at each get_horizons_coord call
+    log.setLevel('WARNING')
+
+    df = pd.read_csv(input_csv)
+
+    if clean_df:
+        for spec in ['p25MeV', 'e100keV', 'e1MeV']:
+            for col in [f'{spec} onset solar wind speed (km/s)', f'{spec} inferred injection time (HH:MM)',
+                        f'{spec} inferred injection date (yyyy-mm-dd)', f'{spec} pathlength used for inferred injection time (au)']:
+                try:
+                    # NOT dropping the column so that column order is unchanged. instead, overwrite all entries with ""
+                    # df.drop(labels=col, axis=1, inplace=True)
+                    df[col] = ""
+                except KeyError as err:
+                    print(err)
+
+    custom_warning('Energies used for inferred injection time calculation are hard-coded per mission and species! They have not been updated since SERPENTINE. Please verify that they are still valid!')  # TODO: Update energies if needed!
+    fixed_mean_energies_p = {'SOLO': np.sqrt(25.09*41.18),
+                             'PSP': np.sqrt(26.91*38.05),
+                             'STEREO-A': np.sqrt(26.3*40.5),
+                             'L1 (SOHO/Wind)': np.sqrt(25*40),
+                             'BepiColombo': 37.0
+                             }
+    fixed_mean_energies_e1000 = {'SOLO': np.sqrt(0.4533*2.4010),
+                                 'PSP': np.sqrt(0.7071*2.8284),
+                                 'STEREO-A': np.sqrt(0.7*2.8),
+                                 'L1 (SOHO/Wind)': np.sqrt(0.67*10.4),
+                                 'BepiColombo': 1.4
+                                 }
+    fixed_mean_energies_e100 = {'SOLO': np.sqrt(85.6*130.5)/1000.,
+                                'PSP': np.sqrt(65.91*153.50)/1000.,
+                                'STEREO-A': np.sqrt(85.*125.)/1000.,
+                                'L1 (SOHO/Wind)': np.sqrt(75.63*140.46)/1000.,
+                                'BepiColombo': 0.106
+                                }
+
+    print('')
+    print("Note: In the following output, the info 'assuming default Vsw value of 0 km/s' is inaccurate.")
+    print(f"This is just an intermediate step, in the end the value {sw} will be used.")
+    print('')
+
+    for i in tqdm(range(df.shape[0])):
+        mission = df['Observer'].iloc[i]
+        if mission == 'L1 (SOHO/Wind)':
+            mission_p = 'SOHO'
+            mission_e1000 = 'SOHO'
+            mission_e100 = 'Wind'
+        else:
+            mission_p = mission
+            mission_e1000 = mission
+            mission_e100 = mission
+
+        onset_date_p_str = df['p25MeV PyOnset date (yyyy-mm-dd)'].iloc[i]
+        onset_time_p_str = df['p25MeV PyOnset time (HH:MM:SS)'].iloc[i]
+        if type(onset_date_p_str) is not str or type(onset_time_p_str) is not str:
+            onset_p = pd.NaT
+        else:
+            onset_p = dt.datetime.strptime(f'{onset_date_p_str} {onset_time_p_str}', '%Y-%m-%d %H:%M:%S')
+
+        onset_date_e1000_str = df['e1MeV PyOnset date (yyyy-mm-dd)'].iloc[i]
+        onset_time_e1000_str = df['e1MeV PyOnset time (HH:MM:SS)'].iloc[i]
+        if type(onset_date_e1000_str) is not str or type(onset_time_e1000_str) is not str:
+            onset_e1000 = pd.NaT
+        else:
+            onset_e1000 = dt.datetime.strptime(f'{onset_date_e1000_str} {onset_time_e1000_str}', '%Y-%m-%d %H:%M:%S')
+
+        onset_date_e100_str = df['e100keV PyOnset date (yyyy-mm-dd)'].iloc[i]
+        onset_time_e100_str = df['e100keV PyOnset time (HH:MM:SS)'].iloc[i]
+        if type(onset_date_e100_str) is not str or type(onset_time_e100_str) is not str:
+            onset_e100 = pd.NaT
+        else:
+            onset_e100 = dt.datetime.strptime(f'{onset_date_e100_str} {onset_time_e100_str}', '%Y-%m-%d %H:%M:%S')
+
+        if type(onset_p) is not pd._libs.tslibs.nattype.NaTType:
+            sw_p = get_sw_speed(body=mission_p, dtime=onset_p, trange=1, default_vsw=0)
+            if not np.isnan(sw_p) and not sw_p == 0:
+                sw_p = int(sw_p)
+                df.loc[i, 'p25MeV onset solar wind speed (km/s)'] = sw_p
+            if np.isnan(sw_p) or sw_p == 0:
+                sw_p = sw
+            inj_time_p, distance_p = inf_inj_time(mission_p, onset_p, 'p', fixed_mean_energies_p[mission], sw_p)
+        else:
+            inj_time_p = pd.NaT
+            distance_p = np.nan
+        if type(onset_e100) is not pd._libs.tslibs.nattype.NaTType:
+            sw_e100 = get_sw_speed(body=mission_e100, dtime=onset_e100, trange=1, default_vsw=0)
+            if not np.isnan(sw_e100) and not sw_e100 == 0:
+                sw_e100 = int(sw_e100)
+                df.loc[i, 'e100keV onset solar wind speed (km/s)'] = sw_e100
+            if np.isnan(sw_e100) or sw_e100 == 0:
+                sw_e100 = sw
+            inj_time_e100, distance_e100 = inf_inj_time(mission_e100, onset_e100, 'e', fixed_mean_energies_e100[mission], sw_e100)
+            # use different energy channels for PSP before 14 June 2021:
+            if mission == 'PSP' and onset_e100 < dt.datetime(2021, 6, 14):
+                inj_time_e100, distance_e100 = inf_inj_time(mission_e100, onset_e100, 'e', np.sqrt(84.1*131.6)/1000., sw_e100)
+        else:
+            inj_time_e100 = pd.NaT
+            distance_e100 = np.nan
+        if type(onset_e1000) is not pd._libs.tslibs.nattype.NaTType:
+            sw_e1000 = get_sw_speed(body=mission_e1000, dtime=onset_e1000, trange=1, default_vsw=0)
+            if not np.isnan(sw_e1000) and not sw_e1000 == 0:
+                sw_e1000 = int(sw_e1000)
+                df.loc[i, 'e1MeV onset solar wind speed (km/s)'] = sw_e1000
+            elif np.isnan(sw_e1000) or sw_e1000 == 0:
+                sw_e1000 = sw
+            inj_time_e1000, distance_e1000 = inf_inj_time(mission_e1000, onset_e1000, 'e', fixed_mean_energies_e1000[mission], sw_e1000)
+        else:
+            inj_time_e1000 = pd.NaT
+            distance_e1000 = np.nan
+
+        # print('')
+        # print(i, mission, onset_p, onset_e1000, onset_e100, sw_p, sw_e1000, sw_e100)
+
+        if type(inj_time_p) is not pd._libs.tslibs.nattype.NaTType:
+            # df['p25MeV inferred injection time (HH:MM:SS)'].iloc[i] = inj_time_p.strftime('%H:%M:%S')
+            # df['p25MeV inferred injection date (yyyy-mm-dd)'].iloc[i] = inj_time_p.strftime('%Y-%m-%d')
+            # df['p25MeV pathlength used for inferred injection time (au)'].iloc[i] = np.round(distance_p.value, 2)
+            if round_minutes:
+                df.loc[i, 'p25MeV inferred injection time (HH:MM)'] = pd.Timestamp(inj_time_p).round('1min').strftime('%H:%M')
+            else:
+                df.loc[i, 'p25MeV inferred injection time (HH:MM:SS)'] = inj_time_p.strftime('%H:%M:%S')
+            df.loc[i, 'p25MeV inferred injection date (yyyy-mm-dd)'] = inj_time_p.strftime('%Y-%m-%d')
+            df.loc[i, 'p25MeV pathlength used for inferred injection time (au)'] = np.round(distance_p.value, 2)
+        if type(inj_time_e1000) is not pd._libs.tslibs.nattype.NaTType:
+            # df['e1MeV inferred injection time (HH:MM:SS)'].iloc[i] = inj_time_e1000.strftime('%H:%M:%S')
+            # df['e1MeV inferred injection date (yyyy-mm-dd)'].iloc[i] = inj_time_e1000.strftime('%Y-%m-%d')
+            # df['e1MeV pathlength used for inferred injection time (au)'].iloc[i] = np.round(distance_e1000.value, 2)
+            if round_minutes:
+                df.loc[i, 'e1MeV inferred injection time (HH:MM)'] = pd.Timestamp(inj_time_e1000).round('1min').strftime('%H:%M')
+            else:
+                df.loc[i, 'e1MeV inferred injection time (HH:MM:SS)'] = inj_time_e1000.strftime('%H:%M:%S')
+            df.loc[i, 'e1MeV inferred injection date (yyyy-mm-dd)'] = inj_time_e1000.strftime('%Y-%m-%d')
+            df.loc[i, 'e1MeV pathlength used for inferred injection time (au)'] = np.round(distance_e1000.value, 2)
+        if type(inj_time_e100) is not pd._libs.tslibs.nattype.NaTType:
+            # df['e100keV inferred injection time (HH:MM:SS)'].iloc[i] = inj_time_e100.strftime('%H:%M:%S')
+            # df['e100keV inferred injection date (yyyy-mm-dd)'].iloc[i] = inj_time_e100.strftime('%Y-%m-%d')
+            # df['e100keV pathlength used for inferred injection time (au)'].iloc[i] = np.round(distance_e100.value, 2)
+            if round_minutes:
+                df.loc[i, 'e100keV inferred injection time (HH:MM)'] = pd.Timestamp(inj_time_e100).round('1min').strftime('%H:%M')
+            else:
+                df.loc[i, 'e100keV inferred injection time (HH:MM:SS)'] = inj_time_e100.strftime('%H:%M:%S')
+            df.loc[i, 'e100keV inferred injection date (yyyy-mm-dd)'] = inj_time_e100.strftime('%Y-%m-%d')
+            df.loc[i, 'e100keV pathlength used for inferred injection time (au)'] = np.round(distance_e100.value, 2)
+
+    if output_csv:
+        df.to_csv(output_csv, index=False)
+        print('')
+        print('Note that the format of some columns might have changed in the new csv file! To avoid this copy only the new columns from it, and paste them into your original spreadsheet.')
+    
+    print('')
+    print('DO NOT FORGET TO RUN convert_psp_soler, TOO!')
+    return df
+
+
+def calc_inf_inj_time_serpentine(input_csv='WP2_multi_sc_catalog - WP2_multi_sc_event_list_draft.csv', output_csv=False, sw=400, clean_df=True, round_minutes=True):
     """
     Calculates inferred injection times from catalogue csv file.
 
@@ -581,7 +852,7 @@ def calc_inf_inj_time(input_csv='WP2_multi_sc_catalog - WP2_multi_sc_event_list_
     Afterwards, columns containing inferred injection times as well as solarwind
     speeds have to be manually copied to the main spreadsheet!
     """
-    from seppy.tools import inf_inj_time
+    from seppy.util import inf_inj_time
     from solarmach import get_sw_speed
     from sunpy import log
     from tqdm import tqdm
@@ -1467,7 +1738,7 @@ for i in tqdm(range(0, len(dates))):  # standard
                             label=f'STEREO-A/SEPT {sector} '+sept_chstring_e, drawstyle='steps-mid')
                 elif type(sept_ch_e) is int:
                     ax.plot(sta_sept_df_e.index, sta_sept_df_e[f'ch_{sept_ch_e}'], color=stereo_sept_color,
-                            linewidth=linewidth, label=f'STEREO-A/SEPT {sector} '+sta_sept_dict_e.loc[sept_ch_e]['ch_strings'], drawstyle='steps-mid')
+                            linewidth=linewidth, label=f'STEREO-A/SEPT {sector} '+sta_sept_dict_e['channels_dict_df_e'].loc[sept_ch_e]['ch_strings'], drawstyle='steps-mid')
                 if plot_times != 'None':
                     [ax.axvline(i, lw=vlw, color=stereo_sept_color) for i in df_sta_onset_e100]
                     [ax.axvline(i, lw=vlw, ls=':', color=stereo_sept_color) for i in df_sta_peak_e100]
@@ -1507,7 +1778,7 @@ for i in tqdm(range(0, len(dates))):  # standard
             # ax2.plot(sta_sept_df_p.index, sta_sept_avg_p, color=stereo_sept_color, linewidth=linewidth, label='STEREO/SEPT '+sept_chstring_p+f' {sector}', drawstyle='steps-mid')
             sept_conta_color = stereo_sept_color  # 'brown'
             ax2.plot(sta_sept_df_p.index, sta_sept_df_p['ch_15'], color=sept_conta_color, ls='--', linewidth=linewidth,
-                     label=f'STEREO-A/SEPT {sector} '+sta_sept_dict_p.loc[15]['ch_strings'], drawstyle='steps-mid')  # +'\n'+r"$\bf{IONS}$"
+                     label=f'STEREO-A/SEPT {sector} '+sta_sept_dict_p['channels_dict_df_p'].loc[15]['ch_strings'], drawstyle='steps-mid')  # +'\n'+r"$\bf{IONS}$"
 
         if add_3dp_conta_ch:
             wind_3dp_conta_ch = 4
@@ -1660,7 +1931,7 @@ for i in tqdm(range(0, len(dates))):  # standard
                 if type(sept_ch_p) is list and len(sta_sept_avg_p) > 0:
                     ax.plot(sta_sept_df_p.index, sta_sept_avg_p, color=stereo_sept_color, linewidth=linewidth, label=f'STEREO-A/SEPT {sector} '+sept_chstring_p, drawstyle='steps-mid')
                 elif type(sept_ch_p) is int:
-                    ax.plot(sta_sept_df_p.index, sta_sept_df_p[f'ch_{sept_ch_p}'], color=stereo_sept_color, linewidth=linewidth, label='STEREO-A/SEPT '+sta_sept_dict_p.loc[sept_ch_p]['ch_strings']+f' {sector}', drawstyle='steps-mid')
+                    ax.plot(sta_sept_df_p.index, sta_sept_df_p[f'ch_{sept_ch_p}'], color=stereo_sept_color, linewidth=linewidth, label='STEREO-A/SEPT '+sta_sept_dict_p['channels_dict_df_p'].loc[sept_ch_p]['ch_strings']+f' {sector}', drawstyle='steps-mid')
             if stereo_het:
                 if len(sta_het_avg_p) > 0:
                     ax.plot(sta_het_avg_p.index, sta_het_avg_p, color=stereo_het_color,
