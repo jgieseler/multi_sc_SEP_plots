@@ -1682,8 +1682,8 @@ def calc_inf_inj_time_soler(input_csv='SOLER_SEP_catalog_PyOnset - WP2_multi_sc_
         print('')
         print('Note that the format of some columns might have changed in the new csv file! To avoid this copy only the new columns from it, and paste them into your original spreadsheet.')
     
-    print('')
-    print('DO NOT FORGET TO RUN convert_psp_soler, TOO!')
+    # print('')
+    # print('DO NOT FORGET TO RUN convert_psp_soler, TOO!')
     return df
 
 
