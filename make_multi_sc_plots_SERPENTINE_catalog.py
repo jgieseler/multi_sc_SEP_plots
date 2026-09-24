@@ -1286,7 +1286,7 @@ def main():
             if SOHO:
                 if ephin_e:
                     # ax.plot(ephin['date'], ephin[ephin_ch_e][0]*ephin_e_intercal, color=soho_ephin_color, linewidth=linewidth, label='SOHO/EPHIN '+ephin[ephin_ch_e][1]+f'/{ephin_e_intercal}', drawstyle='steps-mid')
-                    if len(soho_ephin) > 0:
+                    if len(soho_ephin) > 0 and ephin_ch_e1 in soho_ephin.keys():
                         ax.plot(soho_ephin.index, soho_ephin[ephin_ch_e1], color=soho_ephin_color, linewidth=linewidth, label='SOHO/EPHIN '+ephin_energies['energy_labels'][ephin_ch_e1], drawstyle='steps-mid')
                 if plot_times != 'None':
                     [ax.axvline(i, lw=vlw, color=soho_ephin_color) for i in df_soho_onset_e1000]
