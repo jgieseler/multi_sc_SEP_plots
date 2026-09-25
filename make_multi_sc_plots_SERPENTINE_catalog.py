@@ -76,8 +76,9 @@ def main():
 
     # SOHO:
     erne = True
-    ephin_p = False  # not included yet!
-    ephin_e = True  # not included yet!
+    ephin_p = False
+    ephin_e = True  # L2
+    ephin_e_l3 = True  # L3 (only electrons)
 
     # SOLO:
     ept = True
@@ -703,6 +704,8 @@ def main():
             if ephin_e:
                 ephin_ch_e1 = 'E1300'
                 # ephin_e_intercal = 1/14.
+            if ephin_e_l3:
+                ephin_l3_ch_e1 = 'E12'
             # if ephin_p:
             #     ephin_ch_p = 'p25'
         if SOLO:
@@ -810,7 +813,7 @@ def main():
 
         if SOHO:
             if ephin_e or ephin_p:
-                print('loading soho/ephin')
+                print('loading soho/ephin l2 electrons')
                 # ephin = eph_rl2_loader(startdate.year, startdate.timetuple().tm_yday, doy2=enddate.timetuple().tm_yday, av=av_soho)
                 soho_ephin, ephin_energies = soho_load(dataset="SOHO_COSTEP-EPHIN_L2-1MIN",
                                                     startdate=startdate,
@@ -818,6 +821,15 @@ def main():
                                                     path=soho_path,
                                                     resample=soho_ephin_resample,
                                                     pos_timestamp='center')
+
+            if ephin_e_l3:
+                print('loading soho/ephin l3 electrons')
+                soho_ephin_l3, ephin_l3_energies = soho_load(dataset="SOHO_COSTEP-EPHIN_L3E-1MIN",
+                                                            startdate=startdate,
+                                                            enddate=enddate,
+                                                            path=soho_path,
+                                                            resample=soho_ephin_resample,
+                                                            pos_timestamp='center')
 
             if erne:
                 print('loading soho/erne')
@@ -1287,7 +1299,10 @@ def main():
                 if ephin_e:
                     # ax.plot(ephin['date'], ephin[ephin_ch_e][0]*ephin_e_intercal, color=soho_ephin_color, linewidth=linewidth, label='SOHO/EPHIN '+ephin[ephin_ch_e][1]+f'/{ephin_e_intercal}', drawstyle='steps-mid')
                     if len(soho_ephin) > 0 and ephin_ch_e1 in soho_ephin.keys():
-                        ax.plot(soho_ephin.index, soho_ephin[ephin_ch_e1], color=soho_ephin_color, linewidth=linewidth, label='SOHO/EPHIN '+ephin_energies['energy_labels'][ephin_ch_e1], drawstyle='steps-mid')
+                        ax.plot(soho_ephin.index, soho_ephin[ephin_ch_e1], color=soho_ephin_color, linewidth=linewidth, label='SOHO/EPHIN L2 '+ephin_energies['energy_labels'][ephin_ch_e1], drawstyle='steps-mid')
+                if ephin_e_l3:
+                    if len(soho_ephin_l3) > 0 and ephin_l3_ch_e1 in soho_ephin_l3.keys():
+                        ax.plot(soho_ephin_l3.index, soho_ephin_l3[ephin_l3_ch_e1], color="green", ls='-', linewidth=linewidth, label='SOHO/EPHIN L3 '+ephin_l3_energies['channels_dict_df_e']['ch_strings'].loc[ephin_l3_ch_e1], drawstyle='steps-mid')
                 if plot_times != 'None':
                     [ax.axvline(i, lw=vlw, color=soho_ephin_color) for i in df_soho_onset_e1000]
                     [ax.axvline(i, lw=vlw, ls=':', color=soho_ephin_color) for i in df_soho_peak_e1000]
