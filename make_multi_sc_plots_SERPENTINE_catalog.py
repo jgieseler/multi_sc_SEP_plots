@@ -30,14 +30,14 @@ def main():
     #############################################################
 
     # processing mode: 'regular' (e.g. weekly) or 'events'
-    mode = 'regular'
+    mode = 'events'
 
     # if mode='events', which onset to use: 'classic' or 'pyonset'
     # onset_times = 'classic'
     onset_times = 'pyonset'
 
     lower_proton = False  # True if 13 MeV protons should be used instead of 25+ MeV
-    add_contaminating_channels = False
+    add_contaminating_channels = True
 
     # plot vertical lines with previously found shock times provided by https://parker.gsfc.nasa.gov/shocks.html
     plot_shock_times = False
@@ -1302,7 +1302,7 @@ def main():
                         ax.plot(soho_ephin.index, soho_ephin[ephin_ch_e1], color=soho_ephin_color, linewidth=linewidth, label='SOHO/EPHIN L2 '+ephin_energies['energy_labels'][ephin_ch_e1], drawstyle='steps-mid')
                 if ephin_e_l3:
                     if len(soho_ephin_l3) > 0 and ephin_l3_ch_e1 in soho_ephin_l3.keys():
-                        ax.plot(soho_ephin_l3.index, soho_ephin_l3[ephin_l3_ch_e1], color="green", ls='-', linewidth=linewidth, label='SOHO/EPHIN L3 '+ephin_l3_energies['channels_dict_df_e']['ch_strings'].loc[ephin_l3_ch_e1], drawstyle='steps-mid')
+                        ax.plot(soho_ephin_l3.index, soho_ephin_l3[ephin_l3_ch_e1], color="green", ls='-', linewidth=linewidth, label='SOHO/EPHIN L3 '+ephin_l3_energies['channels_dict_df_e']['ch_strings'].loc[ephin_l3_ch_e1], drawstyle='steps-mid', zorder=1)
                 if plot_times != 'None':
                     [ax.axvline(i, lw=vlw, color=soho_ephin_color) for i in df_soho_onset_e1000]
                     [ax.axvline(i, lw=vlw, ls=':', color=soho_ephin_color) for i in df_soho_peak_e1000]
@@ -1935,6 +1935,9 @@ def get_sc_coords(input_csv='WP2_multi_sc_catalog - WP2_multi_sc_event_list_draf
                         date = n.split('=')[-1]  # %Y%m%d
                     if n.startswith('time='):
                         time = n.split('=')[-1]  # %H%M
+            else:
+                print(f'Row {row} has no Solar-MACH link!')
+                raise ValueError("No Solar-MACH link found")
         elif datetime_source == "Event start date":
             date = ds['Event start date (yyyy-mm-dd)'].replace('-', '')
             time = "1200"
@@ -1963,7 +1966,7 @@ def get_sc_coords(input_csv='WP2_multi_sc_catalog - WP2_multi_sc_event_list_draf
 
 def get_sep_angle(input_csv='WP2_multi_sc_catalog - WP2_multi_sc_event_list_draft.csv', output_csv=False, default_vsw=400.0):
     """
-    Obtains separation angle (and all other Solar-MACH info) for datetime defined in Solar-MACH link amd flare location from DataFrame
+    Obtains separation angle (and all other Solar-MACH info) for datetime defined in Solar-MACH link and flare location from DataFrame
 
     Parameters
     ----------
@@ -1996,12 +1999,14 @@ def get_sep_angle(input_csv='WP2_multi_sc_catalog - WP2_multi_sc_event_list_draf
                 body_list = [ds['Observer']]
 
             if not np.isnan(ds['flare Carrington longitude']):
-                sm = SolarMACH(date=datetime,
-                               body_list=body_list,
-                               reference_long=ds['flare Carrington longitude'],
-                               reference_lat=ds['flare Carrington latitude'],
-                               coord_sys='Carrington',
-                               default_vsw=default_vsw)
+                with warnings.catch_warnings():
+                    warnings.simplefilter("ignore", FutureWarning)
+                    sm = SolarMACH(date=datetime,
+                                body_list=body_list,
+                                reference_long=ds['flare Carrington longitude'],
+                                reference_lat=ds['flare Carrington latitude'],
+                                coord_sys='Carrington',
+                                default_vsw=default_vsw)
                 sep_angle = sm.coord_table["Longitudinal separation between body's magnetic footpoint and reference_long"].values  # TODO: Edit typo when fixed in solarmach -- DONE 2024/02/22
                 if len(sep_angle) == 1:
                     df.loc[row, "Longitudinal separation between SC magnetic footpoint and flare"] = np.round(sep_angle[0], 0).astype(int)
