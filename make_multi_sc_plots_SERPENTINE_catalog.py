@@ -357,10 +357,12 @@ def main():
             df = pd.read_csv('SOLER_SEP_catalog_PyOnset - WP2_multi_sc_event_list_draft.csv')
 
         # get list of flare times
-        df_flare_date_str = df['flare date (yyyy-mm-dd)'].values.astype(str)
-        df_flare_date_str = np.delete(df_flare_date_str, np.where(df_flare_date_str == 'nan'))
-        df_flare_times_str = df['flare time (HH:MM:SS)'].values.astype(str)
-        df_flare_times_str = np.delete(df_flare_times_str, np.where(df_flare_times_str == 'nan'))
+        df_flare_date_str = df['flare date (yyyy-mm-dd)'].fillna('nan').astype(str)
+        df_flare_times_str = df['flare time (HH:MM:SS)'].fillna('nan').astype(str)
+
+        valid = (df_flare_date_str != 'nan') & (df_flare_times_str != 'nan')
+        df_flare_date_str = df_flare_date_str[valid].to_numpy(dtype=str)
+        df_flare_times_str = df_flare_times_str[valid].to_numpy(dtype=str)
         df_flare_times = []
         for i in range(len(df_flare_date_str)):
                 df_flare_times.append(dt.datetime.strptime(f'{df_flare_date_str[i]} {df_flare_times_str[i]}', '%Y-%m-%d %H:%M:%S'))
@@ -385,17 +387,18 @@ def main():
                         print(df_solo[f'{particles} {var} date (yyyy-mm-dd)'][mark])
                         print('')
                         # raise ValueError(f'For {observer}, {var} time is missing while {var} date is defined! See above print out above error for dates.')
-                    df_solo[f'{particles} {var} date (yyyy-mm-dd)'][mark] = np.nan
+                        # Clear both fields for rows where either one is missing.
+                        df_solo.loc[mark, [f'{particles} {var} date (yyyy-mm-dd)', f'{particles} {var} time (HH:MM:SS)']] = np.nan
 
             # protons
-            df_solo_onset_date_p_str = df_solo[f'p25MeV {onset_string} date (yyyy-mm-dd)'].values.astype(str)
+            df_solo_onset_date_p_str = df_solo[f'p25MeV {onset_string} date (yyyy-mm-dd)'].fillna('nan').to_numpy(dtype=str)
             df_solo_onset_date_p_str = np.delete(df_solo_onset_date_p_str, np.where(df_solo_onset_date_p_str == 'nan'))
-            df_solo_onset_time_p_str = df_solo[f'p25MeV {onset_string} time (HH:MM:SS)'].values.astype(str)
+            df_solo_onset_time_p_str = df_solo[f'p25MeV {onset_string} time (HH:MM:SS)'].fillna('nan').to_numpy(dtype=str)
             df_solo_onset_time_p_str = np.delete(df_solo_onset_time_p_str, np.where(df_solo_onset_time_p_str == 'nan'))
 
-            df_solo_peak_date_p_str = df_solo['p25MeV peak date (yyyy-mm-dd)'].values.astype(str)
+            df_solo_peak_date_p_str = df_solo['p25MeV peak date (yyyy-mm-dd)'].fillna('nan').to_numpy(dtype=str)
             df_solo_peak_date_p_str = np.delete(df_solo_peak_date_p_str, np.where(df_solo_peak_date_p_str == 'nan'))
-            df_solo_peak_time_p_str = df_solo['p25MeV peak time (HH:MM:SS)'].values.astype(str)
+            df_solo_peak_time_p_str = df_solo['p25MeV peak time (HH:MM:SS)'].fillna('nan').to_numpy(dtype=str)
             df_solo_peak_time_p_str = np.delete(df_solo_peak_time_p_str, np.where(df_solo_peak_time_p_str == 'nan'))
 
             df_solo_onset_p = []
@@ -407,14 +410,14 @@ def main():
                 df_solo_peak_p.append(dt.datetime.strptime(f'{df_solo_peak_date_p_str[i]} {df_solo_peak_time_p_str[i]}', '%Y-%m-%d %H:%M:%S'))
 
             # 100 keV electrons
-            df_solo_onset_date_e100_str = df_solo[f'e100keV {onset_string} date (yyyy-mm-dd)'].values.astype(str)
+            df_solo_onset_date_e100_str = df_solo[f'e100keV {onset_string} date (yyyy-mm-dd)'].fillna('nan').to_numpy(dtype=str)
             df_solo_onset_date_e100_str = np.delete(df_solo_onset_date_e100_str, np.where(df_solo_onset_date_e100_str == 'nan'))
-            df_solo_onset_time_e100_str = df_solo[f'e100keV {onset_string} time (HH:MM:SS)'].values.astype(str)
+            df_solo_onset_time_e100_str = df_solo[f'e100keV {onset_string} time (HH:MM:SS)'].fillna('nan').to_numpy(dtype=str)
             df_solo_onset_time_e100_str = np.delete(df_solo_onset_time_e100_str, np.where(df_solo_onset_time_e100_str == 'nan'))
 
-            df_solo_peak_date_e100_str = df_solo['e100keV peak date (yyyy-mm-dd)'].values.astype(str)
+            df_solo_peak_date_e100_str = df_solo['e100keV peak date (yyyy-mm-dd)'].fillna('nan').to_numpy(dtype=str)
             df_solo_peak_date_e100_str = np.delete(df_solo_peak_date_e100_str, np.where(df_solo_peak_date_e100_str == 'nan'))
-            df_solo_peak_time_e100_str = df_solo['e100keV peak time (HH:MM:SS)'].values.astype(str)
+            df_solo_peak_time_e100_str = df_solo['e100keV peak time (HH:MM:SS)'].fillna('nan').to_numpy(dtype=str)
             df_solo_peak_time_e100_str = np.delete(df_solo_peak_time_e100_str, np.where(df_solo_peak_time_e100_str == 'nan'))
 
             df_solo_onset_e100 = []
@@ -426,14 +429,14 @@ def main():
                 df_solo_peak_e100.append(dt.datetime.strptime(f'{df_solo_peak_date_e100_str[i]} {df_solo_peak_time_e100_str[i]}', '%Y-%m-%d %H:%M:%S'))
 
             # 1000 keV (1 MeV) electrons
-            df_solo_onset_date_e1000_str = df_solo[f'e1MeV {onset_string} date (yyyy-mm-dd)'].values.astype(str)
+            df_solo_onset_date_e1000_str = df_solo[f'e1MeV {onset_string} date (yyyy-mm-dd)'].fillna('nan').to_numpy(dtype=str)
             df_solo_onset_date_e1000_str = np.delete(df_solo_onset_date_e1000_str, np.where(df_solo_onset_date_e1000_str == 'nan'))
-            df_solo_onset_time_e1000_str = df_solo[f'e1MeV {onset_string} time (HH:MM:SS)'].values.astype(str)
+            df_solo_onset_time_e1000_str = df_solo[f'e1MeV {onset_string} time (HH:MM:SS)'].fillna('nan').to_numpy(dtype=str)
             df_solo_onset_time_e1000_str = np.delete(df_solo_onset_time_e1000_str, np.where(df_solo_onset_time_e1000_str == 'nan'))
 
-            df_solo_peak_date_e1000_str = df_solo['e1MeV peak date (yyyy-mm-dd)'].values.astype(str)
+            df_solo_peak_date_e1000_str = df_solo['e1MeV peak date (yyyy-mm-dd)'].fillna('nan').to_numpy(dtype=str)
             df_solo_peak_date_e1000_str = np.delete(df_solo_peak_date_e1000_str, np.where(df_solo_peak_date_e1000_str == 'nan'))
-            df_solo_peak_time_e1000_str = df_solo['e1MeV peak time (HH:MM:SS)'].values.astype(str)
+            df_solo_peak_time_e1000_str = df_solo['e1MeV peak time (HH:MM:SS)'].fillna('nan').to_numpy(dtype=str)
             df_solo_peak_time_e1000_str = np.delete(df_solo_peak_time_e1000_str, np.where(df_solo_peak_time_e1000_str == 'nan'))
 
             df_solo_onset_e1000 = []
@@ -647,7 +650,7 @@ def main():
         dates = all_onset_dates_first
     # for startdate in tqdm(dates.to_pydatetime()):  # not in use any more
     # for i in tqdm(range(0, len(dates))):  # standard
-    for i in tqdm(range(0, len(dates))):  # standard
+    for i in tqdm(range(95, len(dates))):  # standard
         # for i in tqdm(range(7, len(dates))):
         # for i in tqdm([3, 25, 27, 30, 32, 34, 41, 43, 48]):  # replot some events which automatically are replaced with day+1 plots
         # for i in tqdm([3, 25, 27, 30, 32, 34, 41, 43, 48]):  # replot some events which automatically are replaced with day+1 plots
