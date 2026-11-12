@@ -57,8 +57,8 @@ def main():
         add_bepi_conta_ch = False  # True if contaminaiting Bepi/SIXS ion channel (XXX) should be added to the 100 keV electron panel
 
     if mode == 'regular':
-        first_date = dt.datetime(2025, 6, 3)
-        last_date = dt.datetime(2025, 9, 30)
+        first_date = dt.datetime(2019, 1, 1)
+        last_date = dt.datetime(2026, 6, 30)
         plot_period = '7D'
         averaging = '1h'  # '5min'  # None
 
@@ -650,7 +650,7 @@ def main():
         dates = all_onset_dates_first
     # for startdate in tqdm(dates.to_pydatetime()):  # not in use any more
     # for i in tqdm(range(0, len(dates))):  # standard
-    for i in tqdm(range(95, len(dates))):  # standard
+    for i in tqdm(range(0, len(dates))):  # standard
         # for i in tqdm(range(7, len(dates))):
         # for i in tqdm([3, 25, 27, 30, 32, 34, 41, 43, 48]):  # replot some events which automatically are replaced with day+1 plots
         # for i in tqdm([3, 25, 27, 30, 32, 34, 41, 43, 48]):  # replot some events which automatically are replaced with day+1 plots
