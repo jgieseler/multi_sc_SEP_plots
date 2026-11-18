@@ -1559,7 +1559,7 @@ def calc_inf_inj_time_soler(input_csv='SOLER_SEP_catalog_PyOnset - WP2_multi_sc_
                 try:
                     # NOT dropping the column so that column order is unchanged. instead, overwrite all entries with ""
                     # df.drop(labels=col, axis=1, inplace=True)
-                    df[col] = ""
+                    df[col] = pd.NA  # ""
                 except KeyError as err:
                     print(err)
 
@@ -1759,7 +1759,7 @@ def calc_inf_inj_time_serpentine(input_csv='WP2_multi_sc_catalog - WP2_multi_sc_
                 try:
                     # NOT dropping the column so that column order is unchanged. instead, overwrite all entries with ""
                     # df.drop(labels=col, axis=1, inplace=True)
-                    df[col] = ""
+                    df[col] = pd.NA  # ""
                 except KeyError as err:
                     print(err)
 
