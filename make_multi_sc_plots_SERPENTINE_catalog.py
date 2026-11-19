@@ -1921,16 +1921,18 @@ def get_sc_coords(input_csv='WP2_multi_sc_catalog - WP2_multi_sc_event_list_draf
     """
     import logging
     import sunpy
+    from astropy.time import Time as AstropyTime  # NEW
+    from collections import defaultdict  # NEW
     ori_level = sunpy.log.level
     sunpy.log.setLevel(logging.WARNING)
 
     df = pd.read_csv(input_csv)
     # loop over all rows:
-    for row in tqdm(range(len(df))):
-        ds = df.loc[row]  # get pd.Series of single row
-        # only execute if ALL S/C coords are nan (i.e., empty):
-        # if np.all([np.isnan(ds['S/C distance (au)']), np.isnan(ds['S/C Carrington longitude (deg)']), np.isnan(ds['S/C Carrington latitude (deg)'])]):
-        # print(row)
+    # NEW: replaced row-by-row loop with one batched Horizons call per unique observer
+    row_datetimes = {}
+    body_to_rows = defaultdict(list)
+    for row in range(len(df)):
+        ds = df.loc[row]
         if datetime_source == 'Solar-MACH link':
             if type(ds['Solar-MACH link']) is str:
                 for n in ds['Solar-MACH link'].split('&'):
@@ -1945,19 +1947,20 @@ def get_sc_coords(input_csv='WP2_multi_sc_catalog - WP2_multi_sc_event_list_draf
             date = ds['Event start date (yyyy-mm-dd)'].replace('-', '')
             time = "1200"
             
-        datetime = dt.datetime.strptime(date + time, '%Y%m%d%H%M')
-        # print(datetime)
+        row_datetimes[row] = dt.datetime.strptime(date + time, '%Y%m%d%H%M')
+        # print(row_datetimes[row])
         # use L1 coords for SOHO/Wind:
-        if ds['Observer'] == 'L1 (SOHO/Wind)':
-            sc_coords = get_horizons_coord('SEMB-L1', datetime, None)
-        else:
-            sc_coords = get_horizons_coord(ds['Observer'], datetime, None)
-
+        body = 'SEMB-L1' if ds['Observer'] == 'L1 (SOHO/Wind)' else ds['Observer']
+        body_to_rows[body].append(row)
+    for body, rows in tqdm(body_to_rows.items()):
+        sc_coords = get_horizons_coord(body, AstropyTime([row_datetimes[r] for r in rows]), None)
         # convert from Stonyhurst to Carrington and obtain individual coords:
         sc_coords = sc_coords.transform_to(frames.HeliographicCarrington(observer='Sun'))
-        df.loc[row, 'S/C distance (au)'] = np.round(sc_coords.radius.value, 2)
-        df.loc[row, 'S/C Carrington longitude (deg)'] = np.round(sc_coords.lon.value, 0).astype(int)
-        df.loc[row, 'S/C Carrington latitude (deg)'] = np.round(sc_coords.lat.value, 0).astype(int)
+        for idx, row in enumerate(rows):
+            df.loc[row, 'S/C distance (au)'] = np.round(sc_coords[idx].radius.value, 2)
+            df.loc[row, 'S/C Carrington longitude (deg)'] = np.round(sc_coords[idx].lon.value, 0).astype(int)
+            df.loc[row, 'S/C Carrington latitude (deg)'] = np.round(sc_coords[idx].lat.value, 0).astype(int)
+    # END NEW
     df['S/C Carrington longitude (deg)'] = df['S/C Carrington longitude (deg)'].astype(pd.Int64Dtype())
     df['S/C Carrington latitude (deg)'] = df['S/C Carrington latitude (deg)'].astype(pd.Int64Dtype())
     if output_csv:
@@ -2020,6 +2023,76 @@ def get_sep_angle(input_csv='WP2_multi_sc_catalog - WP2_multi_sc_event_list_draf
         df.to_csv(output_csv, index=False)
         print('')
         print('Note that the format of some columns might have changed in the new csv file! To avoid this copy only the new columns from it, and paste them into your original spreadsheet.')
+    return df
+
+
+def get_sc_coords_old(input_csv='WP2_multi_sc_catalog - WP2_multi_sc_event_list_draft.csv', output_csv=False, datetime_source='Solar-MACH link'):
+    """
+    Obtains spacecraft coordinates for datetime defined in Solar-MACH link.
+
+    Parameters
+    ----------
+    input_csv : string
+        File name of csv file to read in. If not a full path, file is expected in the working directory.
+    output_csv : boolean or string (optional)
+        File name of new csv file to save. If not a full path, file is saved in the working directory.
+    datetime_source : string
+        Source of datetime for which the coordinates are obtained. Either the 'Solar-MACH link' (default) or the "Event start date" (for a fixed time of 12:00)
+
+    Returns
+    -------
+    df: pd.DataFrame
+        Updated DataFrame with obtained spacecraft coordinates
+
+    Example
+    -------
+    df = get_sc_coords(output_csv='new_sc_coords.csv')
+    """
+    import logging
+    import sunpy
+    ori_level = sunpy.log.level
+    sunpy.log.setLevel(logging.WARNING)
+
+    df = pd.read_csv(input_csv)
+    # loop over all rows:
+    for row in tqdm(range(len(df))):
+        ds = df.loc[row]  # get pd.Series of single row
+        # only execute if ALL S/C coords are nan (i.e., empty):
+        # if np.all([np.isnan(ds['S/C distance (au)']), np.isnan(ds['S/C Carrington longitude (deg)']), np.isnan(ds['S/C Carrington latitude (deg)'])]):
+        # print(row)
+        if datetime_source == 'Solar-MACH link':
+            if type(ds['Solar-MACH link']) is str:
+                for n in ds['Solar-MACH link'].split('&'):
+                    if n.startswith('date='):
+                        date = n.split('=')[-1]  # %Y%m%d
+                    if n.startswith('time='):
+                        time = n.split('=')[-1]  # %H%M
+            else:
+                print(f'Row {row} has no Solar-MACH link!')
+                raise ValueError("No Solar-MACH link found")
+        elif datetime_source == "Event start date":
+            date = ds['Event start date (yyyy-mm-dd)'].replace('-', '')
+            time = "1200"
+            
+        datetime = dt.datetime.strptime(date + time, '%Y%m%d%H%M')
+        # print(datetime)
+        # use L1 coords for SOHO/Wind:
+        if ds['Observer'] == 'L1 (SOHO/Wind)':
+            sc_coords = get_horizons_coord('SEMB-L1', datetime, None)
+        else:
+            sc_coords = get_horizons_coord(ds['Observer'], datetime, None)
+
+        # convert from Stonyhurst to Carrington and obtain individual coords:
+        sc_coords = sc_coords.transform_to(frames.HeliographicCarrington(observer='Sun'))
+        df.loc[row, 'S/C distance (au)'] = np.round(sc_coords.radius.value, 2)
+        df.loc[row, 'S/C Carrington longitude (deg)'] = np.round(sc_coords.lon.value, 0).astype(int)
+        df.loc[row, 'S/C Carrington latitude (deg)'] = np.round(sc_coords.lat.value, 0).astype(int)
+    df['S/C Carrington longitude (deg)'] = df['S/C Carrington longitude (deg)'].astype(pd.Int64Dtype())
+    df['S/C Carrington latitude (deg)'] = df['S/C Carrington latitude (deg)'].astype(pd.Int64Dtype())
+    if output_csv:
+        df.to_csv(output_csv, index=False)
+        print('Note that the format of some columns might have changed in the new csv file! To avoid this copy only the new columns from it, and paste them into your original spreadsheet.')
+    sunpy.log.setLevel(ori_level)
     return df
 
 
