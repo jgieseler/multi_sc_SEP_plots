@@ -1542,7 +1542,15 @@ def calc_inf_inj_time_soler(input_csv='SOLER_SEP_catalog_PyOnset - WP2_multi_sc_
     Afterwards, columns containing inferred injection times as well as solarwind
     speeds have to be manually copied to the main spreadsheet!
     """
-    from seppy.util import inf_inj_time, custom_warning
+    # Increase the number of open file descriptors allowed
+    import resource  # NEW
+    resource.setrlimit(resource.RLIMIT_NOFILE, (65536, resource.RLIM_INFINITY))  # NEW
+
+    import astropy.units as u
+    import astropy.constants as const
+    from astropy.time import Time as AstropyTime
+    from collections import defaultdict
+    from seppy.util import custom_warning  # CHANGED: removed inf_inj_time import
     from solarmach import get_sw_speed
     from sunpy import log
     from tqdm import tqdm
@@ -1588,6 +1596,89 @@ def calc_inf_inj_time_soler(input_csv='SOLER_SEP_catalog_PyOnset - WP2_multi_sc_
     print(f"This is just an intermediate step, in the end the value {sw} will be used.")
     print('')
 
+    # NEW: batch-fetch S/C positions at all onset times before the main loop
+    def _prefetch_onset_radial_distances(onset_specs):
+        """
+        Batch-fetch spacecraft radial distances at onset times.
+        Makes exactly one Horizons call per unique body.
+
+        Parameters
+        ----------
+        onset_specs : list of (body_str, onset_datetime)
+            pd.NaT entries are ignored automatically.
+
+        Returns
+        -------
+        dict : {(body_str, onset_datetime): radial_distance_au (float)}
+        """
+        pairs_by_body = defaultdict(set)
+        for body, onset in onset_specs:
+            if isinstance(onset, dt.datetime):  # excludes pd.NaT
+                pairs_by_body[body].add(onset)
+
+        print(f"Fetching S/C positions: {len(pairs_by_body)} Horizons calls "
+            f"for {sum(len(v) for v in pairs_by_body.values())} unique onset times.")
+
+        r_au_cache = {}
+        for body, onsets in tqdm(pairs_by_body.items(),
+                                desc='Fetching S/C coordinates at onset times'):
+            onsets_sorted = sorted(onsets)
+            sc = get_horizons_coord(body, AstropyTime(onsets_sorted), None)
+            sc = sc.transform_to(frames.HeliographicCarrington(observer='Sun'))
+            for idx, onset in enumerate(onsets_sorted):
+                r_au_cache[(body, onset)] = sc[idx].radius.to(u.AU).value
+
+        return r_au_cache
+
+    onset_specs = []
+    for i in range(df.shape[0]):
+        mission = df['Observer'].iloc[i]
+        mission_p     = 'SOHO' if mission == 'L1 (SOHO/Wind)' else mission
+        mission_e1000 = 'SOHO' if mission == 'L1 (SOHO/Wind)' else mission
+        mission_e100  = 'Wind' if mission == 'L1 (SOHO/Wind)' else mission
+        onset_date_p_str    = df['p25MeV PyOnset date (yyyy-mm-dd)'].iloc[i]
+        onset_time_p_str    = df['p25MeV PyOnset time (HH:MM:SS)'].iloc[i]
+        onset_date_e100_str = df['e100keV PyOnset date (yyyy-mm-dd)'].iloc[i]
+        onset_time_e100_str = df['e100keV PyOnset time (HH:MM:SS)'].iloc[i]
+        onset_date_e1000_str = df['e1MeV PyOnset date (yyyy-mm-dd)'].iloc[i]
+        onset_time_e1000_str = df['e1MeV PyOnset time (HH:MM:SS)'].iloc[i]
+        if type(onset_date_p_str) is str and type(onset_time_p_str) is str:
+            onset_specs.append((mission_p, dt.datetime.strptime(f'{onset_date_p_str} {onset_time_p_str}', '%Y-%m-%d %H:%M:%S')))
+        if type(onset_date_e100_str) is str and type(onset_time_e100_str) is str:
+            onset_specs.append((mission_e100, dt.datetime.strptime(f'{onset_date_e100_str} {onset_time_e100_str}', '%Y-%m-%d %H:%M:%S')))
+        if type(onset_date_e1000_str) is str and type(onset_time_e1000_str) is str:
+            onset_specs.append((mission_e1000, dt.datetime.strptime(f'{onset_date_e1000_str} {onset_time_e1000_str}', '%Y-%m-%d %H:%M:%S')))
+    r_au_cache = _prefetch_onset_radial_distances(onset_specs)
+
+    def _inf_inj_time_no_api(radial_distance_au, onset_time, species, kinetic_energy, sw_speed):
+        """
+        Like seppy's inf_inj_time but takes a pre-fetched radial distance (float, AU)
+        instead of calling get_horizons_coord internally.
+        """
+
+        _SOLAR_ROT = (2 * np.pi * u.rad / (25.38 * u.day)).to(u.rad / u.s)
+        if not isinstance(kinetic_energy, u.quantity.Quantity):
+            kinetic_energy = kinetic_energy * u.MeV
+        if not isinstance(sw_speed, u.quantity.Quantity):
+            sw_speed = sw_speed * u.km / u.s
+
+        radial_dist = radial_distance_au * u.AU
+        mass_dict   = {'p': const.m_p, 'e': const.m_e}
+
+        # Parker spiral length
+        tc  = ((_SOLAR_ROT / sw_speed) * (radial_dist.to(u.km) - const.R_sun)).value
+        stc = np.sqrt(tc**2 + 1)
+        spiral_len = 0.5 * u.rad * (sw_speed / _SOLAR_ROT) * (tc * stc + np.log(tc + stc))
+
+        # relativistic particle speed
+        mass  = mass_dict[species]
+        gamma = np.sqrt(1 - (mass * const.c**2 / (kinetic_energy + mass * const.c**2))**2)
+        v     = gamma * const.c
+
+        travel_time = (spiral_len / v).to(u.s)
+        return onset_time - dt.timedelta(seconds=travel_time.value), spiral_len.to(u.AU)
+    # END NEW
+
     for i in tqdm(range(df.shape[0])):
         mission = df['Observer'].iloc[i]
         if mission == 'L1 (SOHO/Wind)':
@@ -1627,7 +1718,7 @@ def calc_inf_inj_time_soler(input_csv='SOLER_SEP_catalog_PyOnset - WP2_multi_sc_
                 df.loc[i, 'p25MeV onset solar wind speed (km/s)'] = sw_p
             if np.isnan(sw_p) or sw_p == 0:
                 sw_p = sw
-            inj_time_p, distance_p = inf_inj_time(mission_p, onset_p, 'p', fixed_mean_energies_p[mission], sw_p)
+            inj_time_p, distance_p = _inf_inj_time_no_api(r_au_cache.get((mission_p, onset_p), np.nan), onset_p, 'p', fixed_mean_energies_p[mission], sw_p)  # CHANGED
         else:
             inj_time_p = pd.NaT
             distance_p = np.nan
@@ -1638,10 +1729,10 @@ def calc_inf_inj_time_soler(input_csv='SOLER_SEP_catalog_PyOnset - WP2_multi_sc_
                 df.loc[i, 'e100keV onset solar wind speed (km/s)'] = sw_e100
             if np.isnan(sw_e100) or sw_e100 == 0:
                 sw_e100 = sw
-            inj_time_e100, distance_e100 = inf_inj_time(mission_e100, onset_e100, 'e', fixed_mean_energies_e100[mission], sw_e100)
+            inj_time_e100, distance_e100 = _inf_inj_time_no_api(r_au_cache.get((mission_e100, onset_e100), np.nan), onset_e100, 'e', fixed_mean_energies_e100[mission], sw_e100)  # CHANGED
             # use different energy channels for PSP before 14 June 2021:
             if mission == 'PSP' and onset_e100 < dt.datetime(2021, 6, 14):
-                inj_time_e100, distance_e100 = inf_inj_time(mission_e100, onset_e100, 'e', np.sqrt(84.1*131.6)/1000., sw_e100)
+                inj_time_e100, distance_e100 = _inf_inj_time_no_api(r_au_cache.get((mission_e100, onset_e100), np.nan), onset_e100, 'e', np.sqrt(84.1*131.6)/1000., sw_e100)  # CHANGED
         else:
             inj_time_e100 = pd.NaT
             distance_e100 = np.nan
@@ -1652,7 +1743,7 @@ def calc_inf_inj_time_soler(input_csv='SOLER_SEP_catalog_PyOnset - WP2_multi_sc_
                 df.loc[i, 'e1MeV onset solar wind speed (km/s)'] = sw_e1000
             elif np.isnan(sw_e1000) or sw_e1000 == 0:
                 sw_e1000 = sw
-            inj_time_e1000, distance_e1000 = inf_inj_time(mission_e1000, onset_e1000, 'e', fixed_mean_energies_e1000[mission], sw_e1000)
+            inj_time_e1000, distance_e1000 = _inf_inj_time_no_api(r_au_cache.get((mission_e1000, onset_e1000), np.nan), onset_e1000, 'e', fixed_mean_energies_e1000[mission], sw_e1000)  # CHANGED
         else:
             inj_time_e1000 = pd.NaT
             distance_e1000 = np.nan
@@ -2093,6 +2184,206 @@ def get_sc_coords_old(input_csv='WP2_multi_sc_catalog - WP2_multi_sc_event_list_
         df.to_csv(output_csv, index=False)
         print('Note that the format of some columns might have changed in the new csv file! To avoid this copy only the new columns from it, and paste them into your original spreadsheet.')
     sunpy.log.setLevel(ori_level)
+    return df
+
+
+def calc_inf_inj_time_soler_old(input_csv='SOLER_SEP_catalog_PyOnset - WP2_multi_sc_event_list_draft.csv', output_csv=False, sw=400, clean_df=True, round_minutes=True):
+    """
+    Calculates inferred injection times from catalogue csv file.
+
+    Parameters
+    ----------
+    input_csv : string
+        File name of csv file to read in. If not a full path, file is expected in the working directory.
+    output_csv : boolean or string (optional)
+        File name of new csv file to save. If not a full path, file is saved in the working directory.
+    sw : integer
+        Solar wind speed in km/s used for the calculation if automatically
+        obtaining measurements doesn't yield results.
+    clean_df : Boolean
+        If True, initially delete columns that will be populate in this function; that is for each species XX:
+        - 'XX onset solar wind speed (km/s)'
+        - 'XX inferred injection time (HH:MM)'
+        - 'XX inferred injection date (yyyy-mm-dd)'
+        - 'XX pathlength used for inferred injection time (au)'
+    round_minutes : Boolean
+        If True, round the inferred injection times to full minutes (e.g., 12:00:31 --> 12:01)
+
+    Returns
+    -------
+    df: pd.DataFrame
+        Updated DataFrame with obtained spacecraft coordinates
+
+    Example
+    -------
+    df = calc_inf_inj_time_soler(output_csv='new_inf_inj_times.csv')
+
+    Note
+    ----
+    Full function code should be copied to terminal, then executed there.
+    Afterwards, columns containing inferred injection times as well as solarwind
+    speeds have to be manually copied to the main spreadsheet!
+    """
+    from seppy.util import inf_inj_time, custom_warning
+    from solarmach import get_sw_speed
+    from sunpy import log
+    from tqdm import tqdm
+
+    # surpress the INFO message at each get_horizons_coord call
+    log.setLevel('WARNING')
+
+    df = pd.read_csv(input_csv)
+
+    if clean_df:
+        for spec in ['p25MeV', 'e100keV', 'e1MeV']:
+            for col in [f'{spec} onset solar wind speed (km/s)', f'{spec} inferred injection time (HH:MM)',
+                        f'{spec} inferred injection date (yyyy-mm-dd)', f'{spec} pathlength used for inferred injection time (au)']:
+                try:
+                    # NOT dropping the column so that column order is unchanged. instead, overwrite all entries with ""
+                    # df.drop(labels=col, axis=1, inplace=True)
+                    df[col] = pd.NA  # ""
+                except KeyError as err:
+                    print(err)
+
+    custom_warning('Energies used for inferred injection time calculation are hard-coded per mission and species! They have not been updated since SERPENTINE. Please verify that they are still valid!')  # TODO: Update energies if needed!
+    fixed_mean_energies_p = {'SOLO': np.sqrt(25.09*41.18),
+                             'PSP': np.sqrt(26.91*38.05),
+                             'STEREO-A': np.sqrt(26.3*40.5),
+                             'L1 (SOHO/Wind)': np.sqrt(25*40),
+                             'BepiColombo': 37.0
+                             }
+    fixed_mean_energies_e1000 = {'SOLO': np.sqrt(0.4533*2.4010),
+                                 'PSP': np.sqrt(0.7071*2.8284),
+                                 'STEREO-A': np.sqrt(0.7*2.8),
+                                 'L1 (SOHO/Wind)': np.sqrt(0.67*10.4),
+                                 'BepiColombo': 1.4
+                                 }
+    fixed_mean_energies_e100 = {'SOLO': np.sqrt(85.6*130.5)/1000.,
+                                'PSP': np.sqrt(65.91*153.50)/1000.,
+                                'STEREO-A': np.sqrt(85.*125.)/1000.,
+                                'L1 (SOHO/Wind)': np.sqrt(75.63*140.46)/1000.,
+                                'BepiColombo': 0.106
+                                }
+
+    print('')
+    print("Note: In the following output, the info 'assuming default Vsw value of 0 km/s' is inaccurate.")
+    print(f"This is just an intermediate step, in the end the value {sw} will be used.")
+    print('')
+
+    for i in tqdm(range(df.shape[0])):
+        mission = df['Observer'].iloc[i]
+        if mission == 'L1 (SOHO/Wind)':
+            mission_p = 'SOHO'
+            mission_e1000 = 'SOHO'
+            mission_e100 = 'Wind'
+        else:
+            mission_p = mission
+            mission_e1000 = mission
+            mission_e100 = mission
+
+        onset_date_p_str = df['p25MeV PyOnset date (yyyy-mm-dd)'].iloc[i]
+        onset_time_p_str = df['p25MeV PyOnset time (HH:MM:SS)'].iloc[i]
+        if type(onset_date_p_str) is not str or type(onset_time_p_str) is not str:
+            onset_p = pd.NaT
+        else:
+            onset_p = dt.datetime.strptime(f'{onset_date_p_str} {onset_time_p_str}', '%Y-%m-%d %H:%M:%S')
+
+        onset_date_e1000_str = df['e1MeV PyOnset date (yyyy-mm-dd)'].iloc[i]
+        onset_time_e1000_str = df['e1MeV PyOnset time (HH:MM:SS)'].iloc[i]
+        if type(onset_date_e1000_str) is not str or type(onset_time_e1000_str) is not str:
+            onset_e1000 = pd.NaT
+        else:
+            onset_e1000 = dt.datetime.strptime(f'{onset_date_e1000_str} {onset_time_e1000_str}', '%Y-%m-%d %H:%M:%S')
+
+        onset_date_e100_str = df['e100keV PyOnset date (yyyy-mm-dd)'].iloc[i]
+        onset_time_e100_str = df['e100keV PyOnset time (HH:MM:SS)'].iloc[i]
+        if type(onset_date_e100_str) is not str or type(onset_time_e100_str) is not str:
+            onset_e100 = pd.NaT
+        else:
+            onset_e100 = dt.datetime.strptime(f'{onset_date_e100_str} {onset_time_e100_str}', '%Y-%m-%d %H:%M:%S')
+
+        if type(onset_p) is not pd._libs.tslibs.nattype.NaTType:
+            sw_p = get_sw_speed(body=mission_p, dtime=onset_p, trange=1, default_vsw=0)
+            if not np.isnan(sw_p) and not sw_p == 0:
+                sw_p = int(sw_p)
+                df.loc[i, 'p25MeV onset solar wind speed (km/s)'] = sw_p
+            if np.isnan(sw_p) or sw_p == 0:
+                sw_p = sw
+            inj_time_p, distance_p = inf_inj_time(mission_p, onset_p, 'p', fixed_mean_energies_p[mission], sw_p)
+        else:
+            inj_time_p = pd.NaT
+            distance_p = np.nan
+        if type(onset_e100) is not pd._libs.tslibs.nattype.NaTType:
+            sw_e100 = get_sw_speed(body=mission_e100, dtime=onset_e100, trange=1, default_vsw=0)
+            if not np.isnan(sw_e100) and not sw_e100 == 0:
+                sw_e100 = int(sw_e100)
+                df.loc[i, 'e100keV onset solar wind speed (km/s)'] = sw_e100
+            if np.isnan(sw_e100) or sw_e100 == 0:
+                sw_e100 = sw
+            inj_time_e100, distance_e100 = inf_inj_time(mission_e100, onset_e100, 'e', fixed_mean_energies_e100[mission], sw_e100)
+            # use different energy channels for PSP before 14 June 2021:
+            if mission == 'PSP' and onset_e100 < dt.datetime(2021, 6, 14):
+                inj_time_e100, distance_e100 = inf_inj_time(mission_e100, onset_e100, 'e', np.sqrt(84.1*131.6)/1000., sw_e100)
+        else:
+            inj_time_e100 = pd.NaT
+            distance_e100 = np.nan
+        if type(onset_e1000) is not pd._libs.tslibs.nattype.NaTType:
+            sw_e1000 = get_sw_speed(body=mission_e1000, dtime=onset_e1000, trange=1, default_vsw=0)
+            if not np.isnan(sw_e1000) and not sw_e1000 == 0:
+                sw_e1000 = int(sw_e1000)
+                df.loc[i, 'e1MeV onset solar wind speed (km/s)'] = sw_e1000
+            elif np.isnan(sw_e1000) or sw_e1000 == 0:
+                sw_e1000 = sw
+            inj_time_e1000, distance_e1000 = inf_inj_time(mission_e1000, onset_e1000, 'e', fixed_mean_energies_e1000[mission], sw_e1000)
+        else:
+            inj_time_e1000 = pd.NaT
+            distance_e1000 = np.nan
+
+        # print('')
+        # print(i, mission, onset_p, onset_e1000, onset_e100, sw_p, sw_e1000, sw_e100)
+
+        if type(inj_time_p) is not pd._libs.tslibs.nattype.NaTType:
+            # df['p25MeV inferred injection time (HH:MM:SS)'].iloc[i] = inj_time_p.strftime('%H:%M:%S')
+            # df['p25MeV inferred injection date (yyyy-mm-dd)'].iloc[i] = inj_time_p.strftime('%Y-%m-%d')
+            # df['p25MeV pathlength used for inferred injection time (au)'].iloc[i] = np.round(distance_p.value, 2)
+            if round_minutes:
+                df.loc[i, 'p25MeV inferred injection time (HH:MM)'] = pd.Timestamp(inj_time_p).round('1min').strftime('%H:%M')
+            else:
+                df.loc[i, 'p25MeV inferred injection time (HH:MM:SS)'] = inj_time_p.strftime('%H:%M:%S')
+            df.loc[i, 'p25MeV inferred injection date (yyyy-mm-dd)'] = inj_time_p.strftime('%Y-%m-%d')
+            df.loc[i, 'p25MeV pathlength used for inferred injection time (au)'] = np.round(distance_p.value, 2)
+        if type(inj_time_e1000) is not pd._libs.tslibs.nattype.NaTType:
+            # df['e1MeV inferred injection time (HH:MM:SS)'].iloc[i] = inj_time_e1000.strftime('%H:%M:%S')
+            # df['e1MeV inferred injection date (yyyy-mm-dd)'].iloc[i] = inj_time_e1000.strftime('%Y-%m-%d')
+            # df['e1MeV pathlength used for inferred injection time (au)'].iloc[i] = np.round(distance_e1000.value, 2)
+            if round_minutes:
+                df.loc[i, 'e1MeV inferred injection time (HH:MM)'] = pd.Timestamp(inj_time_e1000).round('1min').strftime('%H:%M')
+            else:
+                df.loc[i, 'e1MeV inferred injection time (HH:MM:SS)'] = inj_time_e1000.strftime('%H:%M:%S')
+            df.loc[i, 'e1MeV inferred injection date (yyyy-mm-dd)'] = inj_time_e1000.strftime('%Y-%m-%d')
+            df.loc[i, 'e1MeV pathlength used for inferred injection time (au)'] = np.round(distance_e1000.value, 2)
+        if type(inj_time_e100) is not pd._libs.tslibs.nattype.NaTType:
+            # df['e100keV inferred injection time (HH:MM:SS)'].iloc[i] = inj_time_e100.strftime('%H:%M:%S')
+            # df['e100keV inferred injection date (yyyy-mm-dd)'].iloc[i] = inj_time_e100.strftime('%Y-%m-%d')
+            # df['e100keV pathlength used for inferred injection time (au)'].iloc[i] = np.round(distance_e100.value, 2)
+            if round_minutes:
+                df.loc[i, 'e100keV inferred injection time (HH:MM)'] = pd.Timestamp(inj_time_e100).round('1min').strftime('%H:%M')
+            else:
+                df.loc[i, 'e100keV inferred injection time (HH:MM:SS)'] = inj_time_e100.strftime('%H:%M:%S')
+            df.loc[i, 'e100keV inferred injection date (yyyy-mm-dd)'] = inj_time_e100.strftime('%Y-%m-%d')
+            df.loc[i, 'e100keV pathlength used for inferred injection time (au)'] = np.round(distance_e100.value, 2)
+
+    df['p25MeV onset solar wind speed (km/s)'] = pd.to_numeric(df['p25MeV onset solar wind speed (km/s)'], errors='coerce').astype(pd.Int64Dtype())
+    df['e100keV onset solar wind speed (km/s)'] = pd.to_numeric(df['e100keV onset solar wind speed (km/s)'], errors='coerce').astype(pd.Int64Dtype())
+    df['e1MeV onset solar wind speed (km/s)'] = pd.to_numeric(df['e1MeV onset solar wind speed (km/s)'], errors='coerce').astype(pd.Int64Dtype())
+
+    if output_csv:
+        df.to_csv(output_csv, index=False)
+        print('')
+        print('Note that the format of some columns might have changed in the new csv file! To avoid this copy only the new columns from it, and paste them into your original spreadsheet.')
+    
+    # print('')
+    # print('DO NOT FORGET TO RUN convert_psp_soler, TOO!')
     return df
 
 
