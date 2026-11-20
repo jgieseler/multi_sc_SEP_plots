@@ -1464,10 +1464,10 @@ def convert_psp_soler(input_csv='SOLER_SEP_catalog_PyOnset - WP2_multi_sc_event_
     Afterwards, columns containing inferred injection times as well as solarwind
     speeds have to be manually copied to the main spreadsheet!
     """
-    df = pd.read_csv(input_csv)
+    df = pd.read_csv(input_csv, dtype=object)  # CHANGED: dtype=object preserves original formatting of all untouched columns
 
     if events == 'default':
-        events = [7, 20, 25, 31, 33, 34, 36, 37, 39, 40, 41, 43, 45, 48, 49, 50, 51, 52, 60, 62, *range(66, df['event number'].max()+1)]
+        events = [7, 20, 25, 31, 33, 34, 36, 37, 39, 40, 41, 43, 45, 48, 49, 50, 51, 52, 60, 62, *range(66, pd.to_numeric(df['event number']).max()+1)]  # CHANGED: pd.to_numeric() because column is now object
 
     if clean_df:
         for spec in ['e100keV', 'e1MeV']:
@@ -1475,7 +1475,7 @@ def convert_psp_soler(input_csv='SOLER_SEP_catalog_PyOnset - WP2_multi_sc_event_
                 try:
                     # NOT dropping the column so that column order is unchanged. instead, overwrite all entries with ""
                     # df.drop(labels=col, axis=1, inplace=True)
-                    df[col] = np.nan
+                    df[col] = ''
                 except KeyError as err:
                     print(err)
 
@@ -1488,11 +1488,11 @@ def convert_psp_soler(input_csv='SOLER_SEP_catalog_PyOnset - WP2_multi_sc_event_
     #         for spec in ['e100keV', 'e1MeV']:
     #             df[f'{spec} peak flux proxy'].iloc[i] = df[f'{spec} peak flux'].iloc[i] * 10**b_factors[spec]
     #             df[f'{spec} peak flux'].iloc[i] = ""
-    selection = (df['event number'].isin(events)) & (df['Observer'].isin(['PSP']))
+    selection = (pd.to_numeric(df['event number']).isin(events)) & (df['Observer'].isin(['PSP']))  # CHANGED: pd.to_numeric() because column is now object
     for spec in ['e100keV', 'e1MeV']:
-        df.loc[selection, f'{spec} peak flux proxy'] = df.loc[selection, f'{spec} peak flux'] * 10**b_factors[spec]
+        df.loc[selection, f'{spec} peak flux proxy'] = pd.to_numeric(df.loc[selection, f'{spec} peak flux']).apply(lambda x: f'{x * 10**b_factors[spec]:.2E}' if pd.notna(x) else pd.NA)  # CHANGED: pd.to_numeric() because column is now object and formatted as scientific notation string
         # df.loc[selection, f'{spec} peak flux proxy'] = df.loc[selection, f'{spec} peak flux proxy'].apply(lambda x: '{:.2e}'.format(x))
-        df.loc[selection, f'{spec} peak flux'] = np.nan
+        df.loc[selection, f'{spec} peak flux'] = ''
 
     if output_csv:
         df.to_csv(output_csv, index=False)
@@ -1558,7 +1558,7 @@ def calc_inf_inj_time_soler(input_csv='SOLER_SEP_catalog_PyOnset - WP2_multi_sc_
     # surpress the INFO message at each get_horizons_coord call
     log.setLevel('WARNING')
 
-    df = pd.read_csv(input_csv)
+    df = pd.read_csv(input_csv, dtype=object)  # CHANGED: dtype=object preserves original formatting of all untouched columns
 
     if clean_df:
         for spec in ['p25MeV', 'e100keV', 'e1MeV']:
@@ -1756,7 +1756,7 @@ def calc_inf_inj_time_soler(input_csv='SOLER_SEP_catalog_PyOnset - WP2_multi_sc_
             # df['p25MeV inferred injection date (yyyy-mm-dd)'].iloc[i] = inj_time_p.strftime('%Y-%m-%d')
             # df['p25MeV pathlength used for inferred injection time (au)'].iloc[i] = np.round(distance_p.value, 2)
             if round_minutes:
-                df.loc[i, 'p25MeV inferred injection time (HH:MM)'] = pd.Timestamp(inj_time_p).round('1min').strftime('%H:%M')
+                df.loc[i, 'p25MeV inferred injection time (HH:MM)'] = pd.Timestamp(inj_time_p).round('1min').strftime('%-H:%M')  # CHANGED to %-H:%M to avoid leading zero in hour
             else:
                 df.loc[i, 'p25MeV inferred injection time (HH:MM:SS)'] = inj_time_p.strftime('%H:%M:%S')
             df.loc[i, 'p25MeV inferred injection date (yyyy-mm-dd)'] = inj_time_p.strftime('%Y-%m-%d')
@@ -1766,7 +1766,7 @@ def calc_inf_inj_time_soler(input_csv='SOLER_SEP_catalog_PyOnset - WP2_multi_sc_
             # df['e1MeV inferred injection date (yyyy-mm-dd)'].iloc[i] = inj_time_e1000.strftime('%Y-%m-%d')
             # df['e1MeV pathlength used for inferred injection time (au)'].iloc[i] = np.round(distance_e1000.value, 2)
             if round_minutes:
-                df.loc[i, 'e1MeV inferred injection time (HH:MM)'] = pd.Timestamp(inj_time_e1000).round('1min').strftime('%H:%M')
+                df.loc[i, 'e1MeV inferred injection time (HH:MM)'] = pd.Timestamp(inj_time_e1000).round('1min').strftime('%-H:%M')  # CHANGED to %-H:%M to avoid leading zero in hour 
             else:
                 df.loc[i, 'e1MeV inferred injection time (HH:MM:SS)'] = inj_time_e1000.strftime('%H:%M:%S')
             df.loc[i, 'e1MeV inferred injection date (yyyy-mm-dd)'] = inj_time_e1000.strftime('%Y-%m-%d')
@@ -1776,7 +1776,7 @@ def calc_inf_inj_time_soler(input_csv='SOLER_SEP_catalog_PyOnset - WP2_multi_sc_
             # df['e100keV inferred injection date (yyyy-mm-dd)'].iloc[i] = inj_time_e100.strftime('%Y-%m-%d')
             # df['e100keV pathlength used for inferred injection time (au)'].iloc[i] = np.round(distance_e100.value, 2)
             if round_minutes:
-                df.loc[i, 'e100keV inferred injection time (HH:MM)'] = pd.Timestamp(inj_time_e100).round('1min').strftime('%H:%M')
+                df.loc[i, 'e100keV inferred injection time (HH:MM)'] = pd.Timestamp(inj_time_e100).round('1min').strftime('%-H:%M')  # CHANGED to %-H:%M to avoid leading zero in hour 
             else:
                 df.loc[i, 'e100keV inferred injection time (HH:MM:SS)'] = inj_time_e100.strftime('%H:%M:%S')
             df.loc[i, 'e100keV inferred injection date (yyyy-mm-dd)'] = inj_time_e100.strftime('%Y-%m-%d')
@@ -2017,7 +2017,7 @@ def get_sc_coords(input_csv='WP2_multi_sc_catalog - WP2_multi_sc_event_list_draf
     ori_level = sunpy.log.level
     sunpy.log.setLevel(logging.WARNING)
 
-    df = pd.read_csv(input_csv)
+    df = pd.read_csv(input_csv, dtype=object)  # CHANGED: dtype=object preserves original formatting of all untouched columns
     # loop over all rows:
     # NEW: replaced row-by-row loop with one batched Horizons call per unique observer
     row_datetimes = {}
@@ -2048,7 +2048,7 @@ def get_sc_coords(input_csv='WP2_multi_sc_catalog - WP2_multi_sc_event_list_draf
         # convert from Stonyhurst to Carrington and obtain individual coords:
         sc_coords = sc_coords.transform_to(frames.HeliographicCarrington(observer='Sun'))
         for idx, row in enumerate(rows):
-            df.loc[row, 'S/C distance (au)'] = np.round(sc_coords[idx].radius.value, 2)
+            df.loc[row, 'S/C distance (au)'] = f'{sc_coords[idx].radius.value:.2f}'  # CHANGED: string to preserve trailing zeros
             df.loc[row, 'S/C Carrington longitude (deg)'] = np.round(sc_coords[idx].lon.value, 0).astype(int)
             df.loc[row, 'S/C Carrington latitude (deg)'] = np.round(sc_coords[idx].lat.value, 0).astype(int)
     # END NEW
