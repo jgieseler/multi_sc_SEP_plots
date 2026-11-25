@@ -1626,7 +1626,7 @@ def calc_inf_inj_time_soler(input_csv='SOLER_SEP_catalog_PyOnset - WP2_multi_sc_
             sc = get_horizons_coord(body, AstropyTime(onsets_sorted), None)
             sc = sc.transform_to(frames.HeliographicCarrington(observer='Sun'))
             for idx, onset in enumerate(onsets_sorted):
-                r_au_cache[(body, onset)] = sc[idx].radius.to(u.AU).value
+                r_au_cache[(body, onset)] = (sc[idx].radius.to(u.AU).value, sc[idx].lat.to(u.deg).value)  # added latitude
 
         return r_au_cache
 
@@ -1650,10 +1650,13 @@ def calc_inf_inj_time_soler(input_csv='SOLER_SEP_catalog_PyOnset - WP2_multi_sc_
             onset_specs.append((mission_e1000, dt.datetime.strptime(f'{onset_date_e1000_str} {onset_time_e1000_str}', '%Y-%m-%d %H:%M:%S')))
     r_au_cache = _prefetch_onset_radial_distances(onset_specs)
 
-    def _inf_inj_time_no_api(radial_distance_au, onset_time, species, kinetic_energy, sw_speed):
+    def _inf_inj_time_no_api(radial_distance_au, onset_time, species, kinetic_energy, sw_speed, lat):
         """
         Like seppy's inf_inj_time but takes a pre-fetched radial distance (float, AU)
         instead of calling get_horizons_coord internally.
+
+        Computes the Parker spiral arc length using the exact integral (no R_sun=0
+        approximation in the integrand) and accounting for heliographic latitude.
         """
 
         _SOLAR_ROT = (2 * np.pi * u.rad / (25.38 * u.day)).to(u.rad / u.s)
@@ -1661,19 +1664,32 @@ def calc_inf_inj_time_soler(input_csv='SOLER_SEP_catalog_PyOnset - WP2_multi_sc_
             kinetic_energy = kinetic_energy * u.MeV
         if not isinstance(sw_speed, u.quantity.Quantity):
             sw_speed = sw_speed * u.km / u.s
+        if not isinstance(lat, u.quantity.Quantity):
+            lat = lat * u.deg
 
         radial_dist = radial_distance_au * u.AU
         mass_dict   = {'p': const.m_p, 'e': const.m_e}
 
         # Parker spiral length
-        tc  = ((_SOLAR_ROT / sw_speed) * (radial_dist.to(u.km) - const.R_sun)).value
-        stc = np.sqrt(tc**2 + 1)
-        spiral_len = 0.5 * u.rad * (sw_speed / _SOLAR_ROT) * (tc * stc + np.log(tc + stc))
+        b_km      = (sw_speed / _SOLAR_ROT).to(u.km / u.rad).value
+        r_km      = radial_dist.to(u.km).value
+        r0_km     = (1 * u.R_sun).to(u.km).value
+        sin_colat = np.cos(lat.to(u.rad).value)  # sin(colatitude) = cos(latitude)
+
+        def G(u):
+            # antiderivative of sqrt(1 + u^2)
+            s = np.sqrt(1 + u**2)
+            return 0.5 * (u * s + np.log(u + s))
+
+        u1 = r_km  * sin_colat / b_km
+        u0 = r0_km * sin_colat / b_km
+
+        spiral_len = (b_km / sin_colat) * (G(u1) - G(u0)) * u.km
 
         # relativistic particle speed
-        mass  = mass_dict[species]
-        gamma = np.sqrt(1 - (mass * const.c**2 / (kinetic_energy + mass * const.c**2))**2)
-        v     = gamma * const.c
+        mass = mass_dict[species]
+        beta = np.sqrt(1 - (mass * const.c**2 / (kinetic_energy + mass * const.c**2))**2)
+        v    = beta * const.c
 
         travel_time = (spiral_len / v).to(u.s)
         return onset_time - dt.timedelta(seconds=travel_time.value), spiral_len.to(u.AU)
@@ -1718,7 +1734,8 @@ def calc_inf_inj_time_soler(input_csv='SOLER_SEP_catalog_PyOnset - WP2_multi_sc_
                 df.loc[i, 'p25MeV onset solar wind speed (km/s)'] = sw_p
             if np.isnan(sw_p) or sw_p == 0:
                 sw_p = sw
-            inj_time_p, distance_p = _inf_inj_time_no_api(r_au_cache.get((mission_p, onset_p), np.nan), onset_p, 'p', fixed_mean_energies_p[mission], sw_p)  # CHANGED
+            r_au, lat_deg = r_au_cache[(mission_p, onset_p)]
+            inj_time_p, distance_p = _inf_inj_time_no_api(r_au, onset_p, 'p', fixed_mean_energies_p[mission], sw_p, lat_deg)
         else:
             inj_time_p = pd.NaT
             distance_p = np.nan
@@ -1729,10 +1746,11 @@ def calc_inf_inj_time_soler(input_csv='SOLER_SEP_catalog_PyOnset - WP2_multi_sc_
                 df.loc[i, 'e100keV onset solar wind speed (km/s)'] = sw_e100
             if np.isnan(sw_e100) or sw_e100 == 0:
                 sw_e100 = sw
-            inj_time_e100, distance_e100 = _inf_inj_time_no_api(r_au_cache.get((mission_e100, onset_e100), np.nan), onset_e100, 'e', fixed_mean_energies_e100[mission], sw_e100)  # CHANGED
+            r_au, lat_deg = r_au_cache[(mission_e100, onset_e100)]
+            inj_time_e100, distance_e100 = _inf_inj_time_no_api(r_au, onset_e100, 'e', fixed_mean_energies_e100[mission], sw_e100, lat_deg)
             # use different energy channels for PSP before 14 June 2021:
             if mission == 'PSP' and onset_e100 < dt.datetime(2021, 6, 14):
-                inj_time_e100, distance_e100 = _inf_inj_time_no_api(r_au_cache.get((mission_e100, onset_e100), np.nan), onset_e100, 'e', np.sqrt(84.1*131.6)/1000., sw_e100)  # CHANGED
+                inj_time_e100, distance_e100 = _inf_inj_time_no_api(r_au, onset_e100, 'e', np.sqrt(84.1*131.6)/1000., sw_e100, lat_deg)
         else:
             inj_time_e100 = pd.NaT
             distance_e100 = np.nan
@@ -1743,7 +1761,8 @@ def calc_inf_inj_time_soler(input_csv='SOLER_SEP_catalog_PyOnset - WP2_multi_sc_
                 df.loc[i, 'e1MeV onset solar wind speed (km/s)'] = sw_e1000
             elif np.isnan(sw_e1000) or sw_e1000 == 0:
                 sw_e1000 = sw
-            inj_time_e1000, distance_e1000 = _inf_inj_time_no_api(r_au_cache.get((mission_e1000, onset_e1000), np.nan), onset_e1000, 'e', fixed_mean_energies_e1000[mission], sw_e1000)  # CHANGED
+            r_au, lat_deg = r_au_cache[(mission_e1000, onset_e1000)]
+            inj_time_e1000, distance_e1000 = _inf_inj_time_no_api(r_au, onset_e1000, 'e', fixed_mean_energies_e1000[mission], sw_e1000, lat_deg)
         else:
             inj_time_e1000 = pd.NaT
             distance_e1000 = np.nan
